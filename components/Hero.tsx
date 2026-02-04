@@ -69,6 +69,10 @@ export const BrandStory: React.FC = () => {
           <h2 className="text-3xl md:text-5xl font-serif font-bold text-brand mb-6">Ngũ Hành Dưỡng Thân</h2>
           <div className="w-24 h-1 bg-brand-accent mx-auto mb-8 rounded-full"></div>
           <p className="text-gray-600 text-lg leading-relaxed">
+            Trên những cánh rừng Việt, nơi người nông dân vẫn hái lá vào buổi sớm mai, 
+            những cây thảo mộc quen thuộc như lá ổi, lá sen, giảo cổ lam, gừng... 
+            được gìn giữ và phối hòa thành tách trà lành của An Lành Farm.
+            <br/><br/>
             Chúng tôi tin rằng, trà không chỉ để uống, mà là một cách sống. 
             Mỗi yếu tố trong tự nhiên đều tương ứng với một phần của cơ thể, nuôi dưỡng và chữa lành từ sâu bên trong.
           </p>
@@ -135,7 +139,10 @@ export const BrandStory: React.FC = () => {
                 <span className="text-brand-accent font-bold tracking-wider uppercase text-sm mb-2 block">Câu Chuyện Khởi Nguồn</span>
                 <h3 className="text-3xl md:text-4xl font-serif font-bold text-brand mb-6 leading-tight">Trở Về Với Tự Nhiên, <br/>Trở Về Với Chính Mình</h3>
                 <p className="text-gray-600 leading-relaxed mb-6 text-justify">
-                    An Lành Farm ra đời không chỉ là một thương hiệu trà, mà là một lời nhắc nhở về lối sống chậm. Giữa nhịp sống hối hả của đô thị, chúng tôi khao khát mang đến những tách trà gói trọn hương vị của đất trời.
+                    An Lành Farm ra đời không chỉ là một thương hiệu trà, mà là một lời nhắc nhở về lối sống chậm. Giữa nhịp sống hối hả của đô thị, chúng tôi khao khát mang đến những tách trà gói trọn hương vị của đất trời, của sương sớm và nắng ấm.
+                </p>
+                <p className="text-gray-600 leading-relaxed mb-8 text-justify">
+                    Mỗi lá thảo mộc được hái, mỗi mẻ sấy được thực hiện, đều chứa đựng tâm huyết của người nông dân Việt, mong muốn gửi gắm sự an lành đến từng tế bào trong cơ thể bạn.
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -143,14 +150,14 @@ export const BrandStory: React.FC = () => {
                         <div className="bg-green-100 p-2.5 rounded-lg text-green-600 shrink-0"><Sprout size={20}/></div>
                         <div>
                             <h4 className="font-bold text-gray-800 mb-1">100% Thuần Việt</h4>
-                            <p className="text-xs text-gray-500">Nguyên liệu bản địa chuẩn người Việt.</p>
+                            <p className="text-xs text-gray-500">Nguyên liệu bản địa, phù hợp thể trạng người Việt.</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
                         <div className="bg-orange-100 p-2.5 rounded-lg text-orange-600 shrink-0"><Heart size={20}/></div>
                         <div>
                             <h4 className="font-bold text-gray-800 mb-1">Tận Tâm Phụng Sự</h4>
-                            <p className="text-xs text-gray-500">Đặt sức khỏe làm kim chỉ nam.</p>
+                            <p className="text-xs text-gray-500">Đặt sức khỏe của khách hàng làm kim chỉ nam.</p>
                         </div>
                     </div>
                 </div>
@@ -162,7 +169,7 @@ export const BrandStory: React.FC = () => {
              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand to-brand-accent"></div>
              <div className="text-center max-w-3xl mx-auto mb-16 relative z-10">
                 <h3 className="text-2xl md:text-4xl font-serif font-bold text-brand mb-4">Cam Kết Từ An Lành Farm</h3>
-                <p className="text-gray-500">Chất lượng là hành trình minh bạch từ nông trại đến tách trà.</p>
+                <p className="text-gray-500">Chất lượng không chỉ là lời nói, đó là hành trình minh bạch từ nông trại đến tách trà trên tay bạn.</p>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
@@ -171,7 +178,7 @@ export const BrandStory: React.FC = () => {
                         <Leaf size={36} />
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Nguyên Liệu Sạch</h4>
-                    <p className="text-gray-500 text-sm px-4">Thảo mộc VietGAP, thu hái đúng thời điểm dược tính cao nhất.</p>
+                    <p className="text-gray-500 text-sm px-4">Thảo mộc được trồng tại các vùng nguyên liệu chuẩn VietGAP, thu hái đúng thời điểm để giữ trọn dược tính quý giá.</p>
                  </div>
 
                  <div className="text-center group">
@@ -179,7 +186,7 @@ export const BrandStory: React.FC = () => {
                         <ShieldCheck size={36} />
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Công Thức Độc Quyền</h4>
-                    <p className="text-gray-500 text-sm px-4">Cân bằng âm dương theo triết lý Ngũ Hành y học cổ truyền.</p>
+                    <p className="text-gray-500 text-sm px-4">Sự kết hợp tinh tế giữa y học cổ truyền và nghiên cứu hiện đại, đảm bảo sự cân bằng âm dương theo triết lý Ngũ Hành.</p>
                  </div>
 
                  <div className="text-center group">
@@ -187,7 +194,7 @@ export const BrandStory: React.FC = () => {
                         <Package size={36} />
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Sản Xuất An Toàn</h4>
-                    <p className="text-gray-500 text-sm px-4">Nhà máy ISO 22000, quy trình khép kín giữ nguyên hương vị.</p>
+                    <p className="text-gray-500 text-sm px-4">Nhà máy đạt chuẩn ISO 22000, quy trình khép kín đảm bảo vệ sinh an toàn thực phẩm, giữ nguyên hương vị tự nhiên.</p>
                  </div>
              </div>
         </div>
