@@ -93,7 +93,7 @@ export const VoucherSection: React.FC = () => {
 
   if (loading) {
       return (
-        <section className="py-12 bg-gray-50 border-b border-gray-100 flex justify-center">
+        <section className="py-12 bg-[#F3F0E9] border-b border-gray-100 flex justify-center">
             <div className="flex flex-col items-center gap-3">
                 <Loader2 className="animate-spin text-brand" size={30} />
                 <span className="text-gray-400 text-sm">Đang tải ưu đãi mới nhất...</span>
@@ -105,7 +105,7 @@ export const VoucherSection: React.FC = () => {
   if (vouchers.length === 0) return null;
 
   return (
-    <section className="py-12 bg-gray-50 border-b border-gray-100">
+    <section className="py-12 bg-[#F3F0E9] border-b border-gray-100">
       <div className="container mx-auto px-4">
         <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-white px-4 py-1.5 rounded-full shadow-sm border border-gray-100 mb-3">
@@ -139,7 +139,7 @@ export const VoucherSection: React.FC = () => {
                     {/* Perforated Line Effect */}
                     <div className="absolute right-0 top-0 bottom-0 w-[4px] h-full flex flex-col justify-between items-center translate-x-1/2 z-20">
                         {[...Array(8)].map((_, i) => (
-                            <div key={i} className="w-3 h-3 bg-gray-50 rounded-full my-0.5"></div>
+                            <div key={i} className="w-3 h-3 bg-[#F3F0E9] rounded-full my-0.5"></div>
                         ))}
                     </div>
                 </div>
