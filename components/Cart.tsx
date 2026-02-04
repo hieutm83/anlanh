@@ -11,7 +11,7 @@ interface Voucher {
   code: string;
   type: 'shipping' | 'discount';
   value: number;
-  minCondition: number; // shipping: số hộp tối thiểu | discount: tổng tiền tối thiểu
+  minCondition: number; 
   description: string;
 }
 
@@ -76,7 +76,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
           }
       };
       
-      // Chỉ fetch khi mở giỏ hàng và chưa có dữ liệu (hoặc muốn refresh mỗi lần mở thì bỏ điều kiện vouchers.length)
       if (isOpen && vouchers.length === 0) fetchVouchers();
   }, [isOpen]);
 
@@ -94,20 +93,25 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
       }, 0);
   };
 
+  // --- LOGIC TÍNH GIÁ MỚI: Chỉ nhân số lượng và làm tròn ---
   const calculateItemTotal = (item: CartItem) => {
-    const baseTotal = item.price * item.quantity;
-    if (!item.variantName || item.variantName === '1 Hộp') {
-        if (item.quantity >= 3) return { total: baseTotal * 0.9, discount: 10, originalTotal: baseTotal };
-        else if (item.quantity === 2) return { total: baseTotal * 0.95, discount: 5, originalTotal: baseTotal };
-    }
-    return { total: baseTotal, discount: 0, originalTotal: baseTotal };
+    // item.price lúc này là "đơn giá ảo" (có thể bị lẻ thập phân)
+    // Nhân với số lượng sẽ ra tổng tiền chẵn
+    const rawTotal = item.price * item.quantity;
+    
+    // Làm tròn để loại bỏ số lẻ (VD: 626666.666 -> 626667)
+    const total = Math.round(rawTotal);
+    
+    return { total: total, discount: 0, originalTotal: total };
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0);
+  // Tính tổng giỏ hàng (Cũng làm tròn cho chắc chắn)
+  const subtotal = Math.round(cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0));
+  
   const totalBoxes = calculateTotalBoxes(cart);
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- LOGIC TỰ ĐỘNG ÁP DỤNG VOUCHER (DỰA TRÊN DỮ LIỆU ĐỘNG) ---
+  // --- LOGIC TỰ ĐỘNG ÁP DỤNG VOUCHER (THÔNG MINH) ---
   useEffect(() => {
     if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
@@ -115,17 +119,17 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         return;
     }
 
-    // 1. Tìm Voucher Vận Chuyển tốt nhất (Active & Đủ điều kiện)
-    const shippingCandidates = vouchers.filter(v => 
-        v.type === 'shipping' && totalBoxes >= v.minCondition
-    ).sort((a, b) => b.value - a.value); // Ưu tiên giảm nhiều nhất
+    const shippingCandidates = vouchers.filter(v => {
+        if (v.type !== 'shipping') return false;
+        if (v.minCondition > 1000) return subtotal >= v.minCondition;
+        return totalBoxes >= v.minCondition;
+    }).sort((a, b) => b.value - a.value);
 
     setAppliedShippingVoucher(shippingCandidates.length > 0 ? shippingCandidates[0] : null);
 
-    // 2. Tìm Voucher Giảm Giá tốt nhất (Active & Đủ điều kiện)
     const discountCandidates = vouchers.filter(v => 
         v.type === 'discount' && subtotal >= v.minCondition
-    ).sort((a, b) => b.value - a.value); // Ưu tiên giảm nhiều nhất
+    ).sort((a, b) => b.value - a.value);
 
     setAppliedDiscountVoucher(discountCandidates.length > 0 ? discountCandidates[0] : null);
 
@@ -135,7 +139,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   // Tính toán tiền cuối cùng
   let shippingDiscountAmount = 0;
   if (appliedShippingVoucher) {
-      // Giảm tối đa bằng phí ship hiện tại (tránh âm tiền ship)
       shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
   }
 
@@ -150,14 +153,24 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   // --- Helper UI Voucher ---
   const getVoucherStatus = (voucher: Voucher) => {
       if (voucher.type === 'shipping') {
-          const eligible = totalBoxes >= voucher.minCondition;
-          return {
-              eligible,
-              missingText: eligible ? '' : `Mua thêm ${voucher.minCondition - totalBoxes} hộp`,
-              progress: eligible ? 100 : (totalBoxes / voucher.minCondition) * 100
-          };
+          const isMonetaryCondition = voucher.minCondition > 1000;
+          if (isMonetaryCondition) {
+              const eligible = subtotal >= voucher.minCondition;
+              const missing = voucher.minCondition - subtotal;
+              return {
+                  eligible,
+                  missingText: eligible ? '' : `Mua thêm ${missing.toLocaleString('vi-VN')}đ`,
+                  progress: eligible ? 100 : (subtotal / voucher.minCondition) * 100
+              };
+          } else {
+              const eligible = totalBoxes >= voucher.minCondition;
+              return {
+                  eligible,
+                  missingText: eligible ? '' : `Mua thêm ${voucher.minCondition - totalBoxes} hộp`,
+                  progress: eligible ? 100 : (totalBoxes / voucher.minCondition) * 100
+              };
+          }
       } else {
-          // Discount voucher
           const eligible = subtotal >= voucher.minCondition;
           const missing = voucher.minCondition - subtotal;
           return {
@@ -172,7 +185,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
     const code = voucherCodeInput.trim().toUpperCase();
     if(!code) return;
     
-    // Tìm trong danh sách vouchers tải về
     const found = vouchers.find(v => v.code === code);
     
     if (!found) {
@@ -357,7 +369,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {item.variantName ? <span className="text-xs font-semibold text-brand-accent bg-green-50 px-1.5 py-0.5 rounded">{item.variantName}</span> : <span className="text-xs font-medium text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded">1 Hộp</span>}
-                                {discount > 0 && <span className="text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded flex items-center gap-0.5"><Tag size={10} /> -{discount}%</span>}
+                                {/* {discount > 0 && <span className="text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded flex items-center gap-0.5"><Tag size={10} /> -{discount}%</span>} */}
                               </div>
                           </div>
                           <button onClick={() => onRemove(item.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
@@ -369,7 +381,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-brand">+</button>
                           </div>
                           <div className="text-right">
-                              {discount > 0 && <span className="block text-xs text-gray-400 line-through">{originalTotal.toLocaleString('vi-VN')}đ</span>}
+                              {/* {discount > 0 && <span className="block text-xs text-gray-400 line-through">{originalTotal.toLocaleString('vi-VN')}đ</span>} */}
                               <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>
                           </div>
                         </div>
