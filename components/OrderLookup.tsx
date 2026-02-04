@@ -8,7 +8,7 @@ interface OrderLookupProps {
 }
 
 // ✅ Đã cập nhật link Google Apps Script mới nhất của bạn
-const API_URL = "https://script.google.com/macros/s/AKfycbyz5y92pukPPqW1dtBXvnshb6St9eyTiYJ-WhrTYXozGRCJXkvBHAn75VCtyTVa-xtR/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzCzJ2SQ3iPmiJZNKg5k6Ti_9Y6EI79bLmVyhhQmBkPbSfFVga2f4hva_3-_2H-7h3k/exec";
 
 export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => {
   const [orderId, setOrderId] = useState('');
