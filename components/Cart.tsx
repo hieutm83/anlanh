@@ -89,7 +89,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                       map[p.id] = p;
                   });
                   setProductPrices(map);
-                  console.log("Loaded Prices:", map); // Debug để xem giá về chưa
               }
 
           } catch (e) {
@@ -116,64 +115,77 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
       }, 0);
   };
 
-  // --- LOGIC TÍNH GIÁ CHUẨN XÁC TỪ GOOGLE SHEET ---
+  // =================================================================
+  // LOGIC TÍNH GIÁ QUAN TRỌNG (ĐÃ FIX)
+  // =================================================================
   const calculateItemTotal = (item: CartItem) => {
-    // Lấy thông tin giá chuẩn từ Sheet
+    // 1. Tìm giá chuẩn trong Sheet (dựa vào ID sản phẩm)
     const priceInfo = productPrices[item.id];
     const qty = item.quantity;
-    
-    // Nếu chưa có dữ liệu giá từ Sheet, dùng giá tạm thời (item.price) nhưng cảnh báo console
+
+    // --- CASE A: Không tìm thấy giá trong Sheet (hoặc chưa load xong) ---
+    // -> Dùng tạm giá lúc thêm vào giỏ (item.price)
     if (!priceInfo) {
-        console.warn(`Chưa có dữ liệu giá cho SP: ${item.id}. Đang dùng giá fallback.`);
-        return { total: item.price * qty, discount: 0 };
+        return { total: Math.round(item.price * qty), discount: 0 };
     }
 
-    // --- CASE 1: Phân loại "1 Hộp" (Single) ---
-    // Kiểm tra tên variant (mặc định nếu ko phải combo thì là single)
-    if (!item.variantName?.includes('Combo')) {
-        let total = 0;
-        const salePrice = priceInfo.salePrice;
-        const c2Price = priceInfo.combo2Price > 0 ? priceInfo.combo2Price : (salePrice * 2);
-        const c3Price = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (salePrice * 3);
-
-        if (qty === 1) {
-            total = salePrice;
-        } else if (qty === 2) {
-            total = c2Price;
-        } else if (qty === 3) {
-            total = c3Price;
-        } else {
-            // > 3: Giá Combo 3 + (Số lượng thừa * Giá lẻ)
-            const extra = qty - 3;
-            total = c3Price + (extra * salePrice);
-        }
-        
-        return { total: Math.round(total), discount: 0 };
-    }
-
-    // --- CASE 2: Phân loại "Combo 2 Hộp" ---
+    // --- CASE B: Phân loại Combo 2 (Đã chọn mua theo Set) ---
     if (item.variantName?.includes('Combo 2')) {
-        // Giá trọn gói 1 set combo 2
-        const packagePrice = (priceInfo.combo2Price > 0) ? priceInfo.combo2Price : (priceInfo.salePrice * 2);
-        return { total: Math.round(packagePrice * qty), discount: 0 };
+        // Lấy giá Combo 2 trong Sheet. Nếu không có thì fallback: Giá lẻ * 2 * 0.95
+        const c2Price = (priceInfo.combo2Price > 0) 
+            ? priceInfo.combo2Price 
+            : (priceInfo.salePrice * 2 * 0.95);
+        
+        // qty lúc này là số lượng set (ví dụ mua 2 set combo 2)
+        return { total: Math.round(c2Price * qty), discount: 0 };
     }
 
-    // --- CASE 3: Phân loại "Combo 3 Hộp" ---
+    // --- CASE C: Phân loại Combo 3 (Đã chọn mua theo Set) ---
     if (item.variantName?.includes('Combo 3')) {
-        // Giá trọn gói 1 set combo 3
-        const packagePrice = (priceInfo.combo3Price > 0) ? priceInfo.combo3Price : (priceInfo.salePrice * 3);
-        return { total: Math.round(packagePrice * qty), discount: 0 };
+        // Lấy giá Combo 3 trong Sheet. Nếu không có thì fallback: Giá lẻ * 3 * 0.90
+        const c3Price = (priceInfo.combo3Price > 0) 
+            ? priceInfo.combo3Price 
+            : (priceInfo.salePrice * 3 * 0.90);
+            
+        return { total: Math.round(c3Price * qty), discount: 0 };
     }
 
-    // Fallback an toàn
-    return { total: Math.round(item.price * qty), discount: 0 };
+    // --- CASE D: Phân loại "1 Hộp" (Single) - TÍNH BẬC THANG ---
+    // (Bất kỳ loại nào không phải Combo 2/3 đều rơi vào đây)
+    
+    let total = 0;
+    const salePrice = priceInfo.salePrice; // Giá 1 hộp
+    // Giá Combo 2 & 3 lấy từ sheet
+    const c2Price = (priceInfo.combo2Price > 0) ? priceInfo.combo2Price : (salePrice * 2 * 0.95);
+    const c3Price = (priceInfo.combo3Price > 0) ? priceInfo.combo3Price : (salePrice * 3 * 0.90);
+
+    if (qty === 1) {
+        // Mua 1: Giá lẻ
+        total = salePrice;
+    } 
+    else if (qty === 2) {
+        // Mua 2: Giá bằng Combo 2
+        total = c2Price;
+    } 
+    else if (qty === 3) {
+        // Mua 3: Giá bằng Combo 3
+        total = c3Price;
+    } 
+    else {
+        // Mua > 3 (Ví dụ 4, 5, 6...)
+        // Công thức: Giá Combo 3 + (Số lượng thừa * Giá lẻ 1 hộp)
+        const extraQty = qty - 3;
+        total = c3Price + (extraQty * salePrice);
+    }
+
+    return { total: Math.round(total), discount: 0 };
   };
 
   const subtotal = Math.round(cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0));
   const totalBoxes = calculateTotalBoxes(cart);
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- LOGIC VOUCHER ---
+  // --- LOGIC VOUCHER (Giữ nguyên) ---
   useEffect(() => {
     if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
