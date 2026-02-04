@@ -68,7 +68,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const [isCapturing, setIsCapturing] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  // FETCH DỮ LIỆU (Voucher + Products)
+  // FETCH DỮ LIỆU
   useEffect(() => {
       const fetchData = async () => {
           setIsLoadingData(true);
@@ -80,7 +80,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                   setVouchers(voucherJson.data);
               }
 
-              // 2. Lấy Bảng Giá Sản Phẩm (để tính tiền cho đúng)
+              // 2. Lấy Bảng Giá Sản Phẩm
               const productRes = await fetch(`${GOOGLE_SHEET_API_URL}?action=get_products`);
               const productJson = await productRes.json();
               if (productJson.success && Array.isArray(productJson.data)) {
@@ -89,6 +89,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                       map[p.id] = p;
                   });
                   setProductPrices(map);
+                  console.log("Loaded Prices:", map); // Debug để xem giá về chưa
               }
 
           } catch (e) {
@@ -117,39 +118,55 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
 
   // --- LOGIC TÍNH GIÁ CHUẨN XÁC TỪ GOOGLE SHEET ---
   const calculateItemTotal = (item: CartItem) => {
-    // Lấy thông tin giá chuẩn từ Sheet (nếu đã tải xong)
+    // Lấy thông tin giá chuẩn từ Sheet
     const priceInfo = productPrices[item.id];
     const qty = item.quantity;
     
-    // Nếu là phân loại "1 Hộp" (hoặc tên có chữ "1 Hộp") VÀ có dữ liệu giá từ Sheet
-    if (item.variantName?.includes('1 Hộp') && priceInfo) {
-        let total = 0;
-        
-        // Logic 1: Mua 1 -> Giá lẻ
-        if (qty === 1) {
-            total = priceInfo.salePrice;
-        } 
-        // Logic 2: Mua 2 -> Giá Combo 2
-        else if (qty === 2) {
-            total = priceInfo.combo2Price || (priceInfo.salePrice * 2);
-        }
-        // Logic 3: Mua 3 -> Giá Combo 3
-        else if (qty === 3) {
-            total = priceInfo.combo3Price || (priceInfo.salePrice * 3);
-        }
-        // Logic 4: Mua > 3 -> Giá Combo 3 + (Số lượng thừa * Giá lẻ)
-        else {
-            const combo3 = priceInfo.combo3Price || (priceInfo.salePrice * 3);
-            const extra = qty - 3;
-            total = combo3 + (extra * priceInfo.salePrice);
-        }
-        
-        return { total: total, discount: 0 };
+    // Nếu chưa có dữ liệu giá từ Sheet, dùng giá tạm thời (item.price) nhưng cảnh báo console
+    if (!priceInfo) {
+        console.warn(`Chưa có dữ liệu giá cho SP: ${item.id}. Đang dùng giá fallback.`);
+        return { total: item.price * qty, discount: 0 };
     }
 
-    // Trường hợp còn lại: Combo 2, Combo 3 hoặc chưa tải được giá Sheet -> Nhân đơn giá thường
-    // (Lưu ý: Bên Products.tsx đã truyền giá trọn gói của set vào item.price)
-    return { total: item.price * qty, discount: 0 };
+    // --- CASE 1: Phân loại "1 Hộp" (Single) ---
+    // Kiểm tra tên variant (mặc định nếu ko phải combo thì là single)
+    if (!item.variantName?.includes('Combo')) {
+        let total = 0;
+        const salePrice = priceInfo.salePrice;
+        const c2Price = priceInfo.combo2Price > 0 ? priceInfo.combo2Price : (salePrice * 2);
+        const c3Price = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (salePrice * 3);
+
+        if (qty === 1) {
+            total = salePrice;
+        } else if (qty === 2) {
+            total = c2Price;
+        } else if (qty === 3) {
+            total = c3Price;
+        } else {
+            // > 3: Giá Combo 3 + (Số lượng thừa * Giá lẻ)
+            const extra = qty - 3;
+            total = c3Price + (extra * salePrice);
+        }
+        
+        return { total: Math.round(total), discount: 0 };
+    }
+
+    // --- CASE 2: Phân loại "Combo 2 Hộp" ---
+    if (item.variantName?.includes('Combo 2')) {
+        // Giá trọn gói 1 set combo 2
+        const packagePrice = (priceInfo.combo2Price > 0) ? priceInfo.combo2Price : (priceInfo.salePrice * 2);
+        return { total: Math.round(packagePrice * qty), discount: 0 };
+    }
+
+    // --- CASE 3: Phân loại "Combo 3 Hộp" ---
+    if (item.variantName?.includes('Combo 3')) {
+        // Giá trọn gói 1 set combo 3
+        const packagePrice = (priceInfo.combo3Price > 0) ? priceInfo.combo3Price : (priceInfo.salePrice * 3);
+        return { total: Math.round(packagePrice * qty), discount: 0 };
+    }
+
+    // Fallback an toàn
+    return { total: Math.round(item.price * qty), discount: 0 };
   };
 
   const subtotal = Math.round(cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0));
@@ -244,7 +261,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         variant: item.variantName || '1 Hộp',
         price: item.price,
         quantity: item.quantity,
-        subtotal: calculateItemTotal(item).total // Sử dụng giá đã tính toán chuẩn
+        subtotal: calculateItemTotal(item).total
     }));
 
     const voucherCodes = [];
@@ -270,8 +287,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
             body: JSON.stringify(orderPayload)
         });
         setCookie('last_order_id', newOrderId, 7);
-        
-        // Save Local
         const savedOrders = JSON.parse(localStorage.getItem('anlanh_local_orders') || '[]');
         savedOrders.unshift({
              id: newOrderId, status: 'pending', statusText: 'Đang xử lý',
@@ -380,7 +395,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                <div className="border-t border-gray-100 pt-6">
                     <h3 className="font-serif font-bold text-sm mb-3 flex items-center gap-2 text-gray-700"><Ticket size={18} className="text-brand" /> Ưu đãi cho bạn</h3>
                     {isLoadingData ? (
-                        <div className="text-center py-4 text-gray-400 text-xs flex justify-center items-center gap-2"><Loader2 size={16} className="animate-spin" /> Đang kiểm tra ưu đãi...</div>
+                        <div className="text-center py-4 text-gray-400 text-xs flex justify-center items-center gap-2"><Loader2 size={16} className="animate-spin" /> Đang cập nhật giá mới nhất...</div>
                     ) : (
                         <>
                             <div className="mb-4">
