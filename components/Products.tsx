@@ -174,61 +174,36 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
     return { totalPrice, label, discount: discountTag, originalTotal, specialLabel };
   };
 
-  const handleAddToCart = () => {
+const handleAddToCart = () => {
     if (!selectedProduct) return;
     
-    // Lấy dữ liệu giá chuẩn từ Sheet để truyền vào giỏ
-    const sheetData = pricingMap[selectedProduct.id];
-    const basePrice = sheetData ? sheetData.salePrice : selectedProduct.price;
-    const combo2Price = (sheetData && sheetData.combo2Price) ? sheetData.combo2Price : (basePrice * 2 * 0.95);
-    const combo3Price = (sheetData && sheetData.combo3Price) ? sheetData.combo3Price : (basePrice * 3 * 0.90);
-    const combo3Label = (sheetData && sheetData.combo3Label) ? sheetData.combo3Label : "";
+    // Lấy tên hiển thị
+    let variantName = "";
+    if (selectedCombo === 'single') variantName = "1 Hộp";
+    else if (selectedCombo === 'combo2') variantName = "Combo 2 Hộp";
+    else if (selectedCombo === 'combo3') variantName = "Combo 3 Hộp";
 
-    const details = getPriceDetails(selectedProduct, selectedCombo, quantity);
-    
-    let variantName = details.label;
-    let priceForCart = 0;
-    let pricingRules = null; // Biến này quan trọng
-
-    if (selectedCombo === 'single') {
-        if (details.specialLabel) variantName += ` (${details.specialLabel})`;
-        else if (quantity > 3) variantName = `Mua nhiều (${quantity} hộp)`;
-        
-        // MẤU CHỐT: Truyền bộ quy tắc giá để Cart tự tính lại khi tăng giảm số lượng
-        pricingRules = {
-            base: basePrice,
-            c2: combo2Price,
-            c3: combo3Price,
-            label3: combo3Label,
-            originalBase: sheetData ? sheetData.originalPrice : selectedProduct.price * 1.4
-        };
-        // Giá ban đầu (chỉ để hiển thị lúc add, Cart sẽ tính lại ngay)
-        priceForCart = details.totalPrice / quantity;
-    } 
-    else if (selectedCombo === 'combo2') {
-        // Combo 2 tính theo set, giá cố định
-        variantName = "Combo 2 Hộp";
-        priceForCart = combo2Price; // Giá trọn gói 1 set
-    }
-    else if (selectedCombo === 'combo3') {
-        // Combo 3 tính theo set, giá cố định
-        variantName = "Combo 3 Hộp";
-        if (combo3Label) variantName += ` (${combo3Label})`;
-        priceForCart = combo3Price; // Giá trọn gói 1 set
-    }
-
+    // Lấy ảnh hiển thị
     let cartImage = selectedProduct.image;
     if (selectedCombo === 'combo2' && selectedProduct.skuImages?.combo2) cartImage = selectedProduct.skuImages.combo2;
     if (selectedCombo === 'combo3' && selectedProduct.skuImages?.combo3) cartImage = selectedProduct.skuImages.combo3;
 
-    // Gọi hàm add to cart với tham số pricingRules mới
-    // @ts-ignore
+    // Giá: Truyền giá cơ bản (basePrice) cho Single, và giá trọn gói cho Combo
+    // Lưu ý: Giá này chỉ dùng để hiển thị ban đầu, Cart sẽ tự tính lại giá chuẩn từ Sheet
+    const sheetData = pricingMap[selectedProduct.id];
+    let initialPrice = selectedProduct.price;
+
+    if (sheetData) {
+        if (selectedCombo === 'single') initialPrice = sheetData.salePrice;
+        else if (selectedCombo === 'combo2') initialPrice = sheetData.combo2Price || (sheetData.salePrice * 2);
+        else if (selectedCombo === 'combo3') initialPrice = sheetData.combo3Price || (sheetData.salePrice * 3);
+    }
+
     onAddToCart(
-        { ...selectedProduct, image: cartImage, pricingRules }, // Gắn rule vào item
+        { ...selectedProduct, image: cartImage }, 
         quantity, 
         variantName, 
-        priceForCart, 
-        pricingRules // Truyền rule (dự phòng)
+        initialPrice 
     );
     closeModal();
   };
