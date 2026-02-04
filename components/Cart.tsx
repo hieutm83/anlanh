@@ -14,6 +14,7 @@ interface Voucher {
   description: string;
 }
 
+// Interface giá từ Google Sheet
 interface ProductPrice {
     id: string;
     originalPrice: number;
@@ -85,9 +86,12 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
               if (productJson.success && Array.isArray(productJson.data)) {
                   const map: Record<string, ProductPrice> = {};
                   productJson.data.forEach((p: ProductPrice) => {
-                      map[p.id] = p;
+                      // Chuẩn hóa ID để tránh lỗi tìm kiếm
+                      const cleanId = String(p.id).trim().toLowerCase();
+                      map[cleanId] = p;
                   });
                   setProductPrices(map);
+                  console.log("🔥 Bảng giá tải về:", map);
               }
           } catch (e) {
               console.error("Lỗi tải dữ liệu:", e);
@@ -114,55 +118,64 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   };
 
   // =================================================================
-  // LOGIC TÍNH GIÁ ĐÃ CẬP NHẬT (CHUẨN 100% YÊU CẦU)
+  // LOGIC TÍNH GIÁ "1 HỘP" TĂNG SỐ LƯỢNG
   // =================================================================
   const calculateItemTotal = (item: CartItem) => {
-    // 1. Tìm giá trong Sheet
-    const priceInfo = productPrices[item.id];
+    // 1. Tìm giá trong Sheet bằng ID chuẩn hóa
+    const cleanId = String(item.id).trim().toLowerCase();
+    const priceInfo = productPrices[cleanId];
+    
     const qty = item.quantity;
 
-    // Fallback nếu chưa tải được giá Sheet (dùng giá tạm từ item)
+    // Nếu chưa có giá Sheet -> Dùng tạm giá lúc thêm vào giỏ (Fallback)
     if (!priceInfo) {
         return { total: item.price * qty, discount: 0 };
     }
 
-    const salePrice = priceInfo.salePrice; // Giá bán lẻ
-    // Giá Combo 2 & 3 (Ưu tiên Sheet, nếu ko có thì tự tính)
-    const c2Price = priceInfo.combo2Price > 0 ? priceInfo.combo2Price : (salePrice * 2 * 0.95);
-    const c3Price = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (salePrice * 3 * 0.90);
+    const salePrice = priceInfo.salePrice; // Giá 1 hộp (139k)
+    // Giá Combo lấy từ Sheet (Ưu tiên tuyệt đối)
+    const c2Price = priceInfo.combo2Price; // 265k
+    const c3Price = priceInfo.combo3Price; // 376k
 
     let total = 0;
 
-    // --- CASE A: Mua theo dạng HỘP LẺ (Single) ---
-    // (Tên không chứa chữ 'Combo')
+    // --- KIỂM TRA PHÂN LOẠI ---
+    
+    // CASE 1: Phân loại "1 Hộp" (Hoặc tên không chứa chữ Combo)
+    // Đây là trường hợp bạn đang gặp lỗi: Mua lẻ nhưng tăng số lượng
     if (!item.variantName?.includes('Combo')) {
         if (qty === 1) {
-            // Mua 1: Giá lẻ như file
             total = salePrice;
         } 
         else if (qty === 2) {
-            // Mua 2: Giá Combo 2
-            total = c2Price;
+            // Mua 2 hộp lẻ -> Tính giá Combo 2
+            total = c2Price > 0 ? c2Price : salePrice * 2;
         } 
         else if (qty === 3) {
-            // Mua 3: Giá Combo 3
-            total = c3Price;
+            // Mua 3 hộp lẻ -> Tính giá Combo 3
+            total = c3Price > 0 ? c3Price : salePrice * 3;
         } 
         else {
-            // Mua >= 4: Giá Combo 3 + (Số lượng thừa * Giá lẻ 1 hộp)
+            // Mua > 3 hộp lẻ -> Giá Combo 3 + (Số dư * Giá lẻ)
+            // Ví dụ mua 5: 376k + (2 * 139k)
+            const baseC3 = c3Price > 0 ? c3Price : salePrice * 3;
             const extraQty = qty - 3;
-            total = c3Price + (extraQty * salePrice);
+            total = baseC3 + (extraQty * salePrice);
         }
     } 
-    // --- CASE B: Mua theo dạng SET Combo 2 ---
+    
+    // CASE 2: Phân loại "Combo 2 Hộp" (Đã chọn gói Combo ngay từ đầu)
     else if (item.variantName?.includes('Combo 2')) {
-        // qty ở đây là số lượng SET (Ví dụ 2 set Combo 2 = 4 hộp)
-        total = c2Price * qty;
+        // qty ở đây là số lượng SET. VD: 2 set Combo 2 = 2 * 265k
+        const finalC2 = c2Price > 0 ? c2Price : salePrice * 2;
+        total = finalC2 * qty;
     }
-    // --- CASE C: Mua theo dạng SET Combo 3 ---
+    
+    // CASE 3: Phân loại "Combo 3 Hộp" (Đã chọn gói Combo ngay từ đầu)
     else if (item.variantName?.includes('Combo 3')) {
-        // qty ở đây là số lượng SET
-        total = c3Price * qty;
+        // qty ở đây là số lượng SET. VD: 2 set Combo 3 = 2 * 376k
+        const finalC3 = c3Price > 0 ? c3Price : salePrice * 3;
+        total = finalC3 * qty;
     }
 
     return { total: Math.round(total), discount: 0 };
@@ -172,40 +185,31 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const totalBoxes = calculateTotalBoxes(cart);
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- LOGIC VOUCHER ---
+  // --- LOGIC VOUCHER (Giữ nguyên) ---
   useEffect(() => {
     if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
         setAppliedShippingVoucher(null);
         return;
     }
-
     const shippingCandidates = vouchers.filter(v => {
         if (v.type !== 'shipping') return false;
         if (v.minCondition > 1000) return subtotal >= v.minCondition;
         return totalBoxes >= v.minCondition;
     }).sort((a, b) => b.value - a.value);
-
     setAppliedShippingVoucher(shippingCandidates.length > 0 ? shippingCandidates[0] : null);
 
     const discountCandidates = vouchers.filter(v => 
         v.type === 'discount' && subtotal >= v.minCondition
     ).sort((a, b) => b.value - a.value);
-
     setAppliedDiscountVoucher(discountCandidates.length > 0 ? discountCandidates[0] : null);
-
   }, [cart, subtotal, totalBoxes, formData.address, vouchers]);
 
   
   let shippingDiscountAmount = 0;
-  if (appliedShippingVoucher) {
-      shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
-  }
-
+  if (appliedShippingVoucher) shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
   let productDiscountAmount = 0;
-  if (appliedDiscountVoucher) {
-      productDiscountAmount = appliedDiscountVoucher.value;
-  }
+  if (appliedDiscountVoucher) productDiscountAmount = appliedDiscountVoucher.value;
 
   const finalShippingFee = Math.max(0, baseShippingFee - shippingDiscountAmount);
   const finalTotal = Math.max(0, subtotal + finalShippingFee - productDiscountAmount);
@@ -382,7 +386,11 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-brand">+</button>
                           </div>
                           <div className="text-right">
-                              {isLoadingData ? <span className="text-xs text-gray-400">Đang cập nhật...</span> : <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>}
+                              {isLoadingData ? (
+                                  <span className="text-xs text-gray-400 flex items-center gap-1 justify-end"><Loader2 size={12} className="animate-spin"/> Tính giá...</span>
+                              ) : (
+                                  <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -472,10 +480,16 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         {!orderSuccess && cart.length > 0 && (
           <div className="p-5 border-t border-gray-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0">
             <div className="space-y-2 mb-4 text-sm">
-                <div className="flex justify-between items-center text-gray-500"><span>Tạm tính:</span>{isLoadingData ? <span className="text-xs text-gray-400">Đang cập nhật...</span> : <span>{subtotal.toLocaleString('vi-VN')}đ</span>}</div>
+                <div className="flex justify-between items-center text-gray-500">
+                    <span>Tạm tính:</span>
+                    {isLoadingData ? <span className="text-xs text-gray-400"><Loader2 size={12} className="animate-spin inline"/> Đang tính...</span> : <span>{subtotal.toLocaleString('vi-VN')}đ</span>}
+                </div>
                 <div className="flex justify-between items-center text-gray-500"><span>Phí vận chuyển:</span><div className="text-right">{finalShippingFee === 0 && baseShippingFee > 0 ? <><span className="text-xs text-gray-400 line-through mr-1">{baseShippingFee.toLocaleString('vi-VN')}đ</span><span className="text-green-600 font-medium">Miễn phí</span></> : <span>{baseShippingFee.toLocaleString('vi-VN')}đ</span>}</div></div>
                 {productDiscountAmount > 0 && (<div className="flex justify-between items-center text-green-600"><span className="flex items-center gap-1"><Ticket size={14}/> Voucher giảm giá:</span><span>-{productDiscountAmount.toLocaleString('vi-VN')}đ</span></div>)}
-                <div className="flex justify-between items-center text-base pt-2 border-t border-dashed border-gray-200"><span className="font-bold text-gray-800">Tổng thanh toán:</span>{isLoadingData ? <span className="text-sm text-gray-400">Đang cập nhật...</span> : <span className="text-2xl font-bold text-brand">{finalTotal.toLocaleString('vi-VN')}đ</span>}</div>
+                <div className="flex justify-between items-center text-base pt-2 border-t border-dashed border-gray-200">
+                    <span className="font-bold text-gray-800">Tổng thanh toán:</span>
+                    {isLoadingData ? <span className="text-sm text-gray-400">Đang cập nhật...</span> : <span className="text-2xl font-bold text-brand">{finalTotal.toLocaleString('vi-VN')}đ</span>}
+                </div>
             </div>
             <button type="submit" form="order-form" disabled={isSubmitting || isLoadingData} className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${isSubmitting || isLoadingData ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand hover:bg-brand-accent active:scale-95'}`}>{isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Đang xử lý...</> : 'Đặt Hàng Ngay'}</button>
             <p className="text-center text-xs text-gray-400 mt-3">Thanh toán khi nhận hàng (COD)</p>
