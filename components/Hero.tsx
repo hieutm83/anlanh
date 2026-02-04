@@ -1,30 +1,27 @@
 import React from 'react';
-import { ArrowDown, Wind, Droplets, Sun, Cloud, Mountain, Hexagon, Sprout, Heart, Leaf, ShieldCheck, Package } from 'lucide-react';
+import { 
+  ArrowDown, Wind, Droplets, Sun, Hexagon, Mountain, 
+  Sprout, Heart, Leaf, ShieldCheck, Package 
+} from 'lucide-react';
 
 export const Hero: React.FC = () => {
   return (
     <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background Image with Overlay */}
-        <div 
-          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{ 
-            // Giữ nguyên link ảnh bạn vừa gửi
-            backgroundImage: 'url("https://vwu.vn/documents/1809139/0/chauthilan+thuoctam+1.jpg/61ef63ed-9d84-4590-bece-0b39fde524b5?q=80&w=2069&auto=format&fit=crop")',
-          }}
-        >
-          {/* SỬA LẠI LỚP PHỦ: 
-              - Thay đổi từ: from-black/30 via-transparent (trong suốt)
-              - Thành: from-black/70 via-black/50 (đen mờ)
-              -> Giúp ảnh tối đi để chữ trắng nổi bật, dễ đọc hơn.
-          */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-brand-bg/70"></div>
-        </div>
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: 'url("https://vwu.vn/documents/1809139/0/chauthilan+thuoctam+1.jpg/61ef63ed-9d84-4590-bece-0b39fde524b5?q=80&w=2069&auto=format&fit=crop")',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-brand-bg/70"></div>
+      </div>
 
       <div className="container mx-auto px-4 relative z-10 text-center pt-20">
         <div className="mb-6 inline-block animate-fade-in-up">
-            <span className="bg-white/90 text-brand px-4 py-1 rounded-full text-sm font-semibold tracking-wider uppercase backdrop-blur-sm">
-                Tinh hoa thảo mộc Việt
-            </span>
+          <span className="bg-white/90 text-brand px-4 py-1 rounded-full text-sm font-semibold tracking-wider uppercase backdrop-blur-sm">
+            Tinh hoa thảo mộc Việt
+          </span>
         </div>
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold text-white mb-6 leading-tight drop-shadow-lg">
           Sống An Nhiên <br/> Giữa Đời Hiện Đại
@@ -50,12 +47,13 @@ export const Hero: React.FC = () => {
 };
 
 export const BrandStory: React.FC = () => {
+  // Cấu trúc Ngũ Hành sắp xếp theo vòng tròn tương sinh (Mộc - Hỏa - Thổ - Kim - Thủy)
   const philosophies = [
-    { icon: <Wind />, title: 'Mộc', desc: 'Khơi sinh - Thanh lọc', colorClass: 'group-hover:bg-green-600' },
-    { icon: <Mountain />, title: 'Thổ', desc: 'Cân bằng - Chuyển hóa', colorClass: 'group-hover:bg-amber-700' },
-    { icon: <Hexagon />, title: 'Kim', desc: 'Ổn định - Bền vững', colorClass: 'group-hover:bg-gray-500' },
-    { icon: <Droplets />, title: 'Thủy', desc: 'Lắng dịu - Dưỡng tâm', colorClass: 'group-hover:bg-blue-600' },
-    { icon: <Sun />, title: 'Hỏa', desc: 'Ấm lành - Năng lượng', colorClass: 'group-hover:bg-red-600' },
+    { icon: <Wind />, title: 'Mộc', desc: 'Khơi sinh', colorClass: 'group-hover:bg-green-600', angle: -90 }, // Đỉnh trên
+    { icon: <Sun />, title: 'Hỏa', desc: 'Ấm lành', colorClass: 'group-hover:bg-red-600', angle: -18 },
+    { icon: <Mountain />, title: 'Thổ', desc: 'Cân bằng', colorClass: 'group-hover:bg-amber-700', angle: 54 },
+    { icon: <Hexagon />, title: 'Kim', desc: 'Ổn định', colorClass: 'group-hover:bg-gray-500', angle: 126 },
+    { icon: <Droplets />, title: 'Thủy', desc: 'Lắng dịu', colorClass: 'group-hover:bg-blue-600', angle: 198 },
   ];
 
   return (
@@ -71,26 +69,51 @@ export const BrandStory: React.FC = () => {
           <h2 className="text-3xl md:text-5xl font-serif font-bold text-brand mb-6">Ngũ Hành Dưỡng Thân</h2>
           <div className="w-24 h-1 bg-brand-accent mx-auto mb-8 rounded-full"></div>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Trên những cánh rừng Việt, nơi người nông dân vẫn hái lá thảo mộc vào buổi sớm mai, 
-            những cây thảo mộc quen thuộc như lá ổi, lá sen, giảo cổ lam, gừng... 
-            được gìn giữ và phối hòa thành tách trà lành của An Lành Farm.
-            <br/><br/>
             Chúng tôi tin rằng, trà không chỉ để uống, mà là một cách sống. 
             Mỗi yếu tố trong tự nhiên đều tương ứng với một phần của cơ thể, nuôi dưỡng và chữa lành từ sâu bên trong.
           </p>
         </div>
 
-        {/* 5 Elements Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-24">
-          {philosophies.map((item, index) => (
-            <div key={index} className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 text-center group border border-gray-100 hover:-translate-y-1">
-              <div className={`w-14 h-14 bg-brand-bg rounded-full flex items-center justify-center mx-auto mb-4 text-brand group-hover:text-white transition-all duration-300 ${item.colorClass}`}>
-                {React.cloneElement(item.icon as React.ReactElement, { size: 28 })}
+        {/* 5 Elements Pentagon Layout */}
+        <div className="relative w-full max-w-[320px] sm:max-w-[450px] md:max-w-[550px] aspect-square mx-auto mb-32">
+          {/* Central Decoration */}
+          <div className="absolute inset-0 flex items-center justify-center">
+             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white shadow-inner flex items-center justify-center border border-brand/10 z-0">
+                <div className="text-center">
+                  <span className="text-brand font-serif font-bold text-sm md:text-base leading-tight block">AN LÀNH</span>
+                  <span className="text-brand-accent font-serif italic text-xs">Farm</span>
+                </div>
+             </div>
+          </div>
+
+          {/* Pentagon Items */}
+          {philosophies.map((item, index) => {
+            // Radius 40-42% để nội dung không bị tràn mép container
+            const radius = 40; 
+            const x = 50 + radius * Math.cos((item.angle * Math.PI) / 180);
+            const y = 50 + radius * Math.sin((item.angle * Math.PI) / 180);
+
+            return (
+              <div 
+                key={index} 
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 w-28 sm:w-36 md:w-44 z-10"
+                style={{ left: `${x}%`, top: `${y}%` }}
+              >
+                <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-500 text-center group border border-gray-100 hover:-translate-y-2">
+                  <div className={`w-10 h-10 md:w-14 md:h-14 bg-brand-bg rounded-full flex items-center justify-center mx-auto mb-2 md:mb-3 text-brand group-hover:text-white transition-all duration-300 ${item.colorClass}`}>
+                    {React.cloneElement(item.icon as React.ReactElement, { size: 24 })}
+                  </div>
+                  <h3 className="text-base md:text-xl font-serif font-bold text-brand mb-1">{item.title}</h3>
+                  <p className="text-[10px] md:text-xs text-gray-500 font-medium uppercase tracking-widest">{item.desc}</p>
+                </div>
               </div>
-              <h3 className={`text-xl font-serif font-bold text-brand mb-2 transition-colors duration-300`}>{item.title}</h3>
-              <p className="text-sm text-gray-500 font-medium">{item.desc}</p>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Background Connecting Circle */}
+          <svg className="absolute inset-0 w-full h-full -z-10 opacity-10" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-brand" strokeDasharray="4 2" />
+          </svg>
         </div>
 
         {/* Origin Story Section */}
@@ -112,10 +135,7 @@ export const BrandStory: React.FC = () => {
                 <span className="text-brand-accent font-bold tracking-wider uppercase text-sm mb-2 block">Câu Chuyện Khởi Nguồn</span>
                 <h3 className="text-3xl md:text-4xl font-serif font-bold text-brand mb-6 leading-tight">Trở Về Với Tự Nhiên, <br/>Trở Về Với Chính Mình</h3>
                 <p className="text-gray-600 leading-relaxed mb-6 text-justify">
-                    An Lành Farm ra đời không chỉ là một thương hiệu trà, mà là một lời nhắc nhở về lối sống chậm. Giữa nhịp sống hối hả của đô thị, chúng tôi khao khát mang đến những tách trà gói trọn hương vị của đất trời, của sương sớm và nắng ấm.
-                </p>
-                <p className="text-gray-600 leading-relaxed mb-8 text-justify">
-                    Mỗi lá thảo mộc được hái, mỗi mẻ sấy được thực hiện, đều chứa đựng tâm huyết của người nông dân Việt, mong muốn gửi gắm sự an lành đến từng tế bào trong cơ thể bạn.
+                    An Lành Farm ra đời không chỉ là một thương hiệu trà, mà là một lời nhắc nhở về lối sống chậm. Giữa nhịp sống hối hả của đô thị, chúng tôi khao khát mang đến những tách trà gói trọn hương vị của đất trời.
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -123,28 +143,26 @@ export const BrandStory: React.FC = () => {
                         <div className="bg-green-100 p-2.5 rounded-lg text-green-600 shrink-0"><Sprout size={20}/></div>
                         <div>
                             <h4 className="font-bold text-gray-800 mb-1">100% Thuần Việt</h4>
-                            <p className="text-xs text-gray-500">Nguyên liệu bản địa, phù hợp thể trạng người Việt.</p>
+                            <p className="text-xs text-gray-500">Nguyên liệu bản địa chuẩn người Việt.</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
                         <div className="bg-orange-100 p-2.5 rounded-lg text-orange-600 shrink-0"><Heart size={20}/></div>
                         <div>
                             <h4 className="font-bold text-gray-800 mb-1">Tận Tâm Phụng Sự</h4>
-                            <p className="text-xs text-gray-500">Đặt sức khỏe của khách hàng làm kim chỉ nam.</p>
+                            <p className="text-xs text-gray-500">Đặt sức khỏe làm kim chỉ nam.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-         {/* Values / Process Section */}
+        {/* Cam Kết Section */}
         <div className="bg-white rounded-[2.5rem] p-8 md:p-16 shadow-xl border border-gray-100 relative overflow-hidden">
-             {/* Background Pattern */}
              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand to-brand-accent"></div>
-             
              <div className="text-center max-w-3xl mx-auto mb-16 relative z-10">
                 <h3 className="text-2xl md:text-4xl font-serif font-bold text-brand mb-4">Cam Kết Từ An Lành Farm</h3>
-                <p className="text-gray-500 text-lg">Chất lượng không chỉ là lời nói, đó là hành trình minh bạch từ nông trại đến tách trà trên tay bạn.</p>
+                <p className="text-gray-500">Chất lượng là hành trình minh bạch từ nông trại đến tách trà.</p>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
@@ -153,21 +171,15 @@ export const BrandStory: React.FC = () => {
                         <Leaf size={36} />
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Nguyên Liệu Sạch</h4>
-                    <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Thảo mộc được tại các vùng nguyên liệu chuẩn VietGAP, thu hái đúng thời điểm để giữ trọn dược tính quý giá.
-                    </p>
+                    <p className="text-gray-500 text-sm px-4">Thảo mộc VietGAP, thu hái đúng thời điểm dược tính cao nhất.</p>
                  </div>
 
                  <div className="text-center group">
-                     <div className="relative">
-                        <div className="w-20 h-20 mx-auto bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-6 group-hover:bg-amber-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                            <ShieldCheck size={36} />
-                        </div>
-                     </div>
+                    <div className="w-20 h-20 mx-auto bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-6 group-hover:bg-amber-700 group-hover:text-white transition-all duration-300 shadow-sm">
+                        <ShieldCheck size={36} />
+                    </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Công Thức Độc Quyền</h4>
-                    <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Sự kết hợp tinh tế giữa y học cổ truyền và nghiên cứu hiện đại, đảm bảo sự cân bằng âm dương theo triết lý Ngũ Hành.
-                    </p>
+                    <p className="text-gray-500 text-sm px-4">Cân bằng âm dương theo triết lý Ngũ Hành y học cổ truyền.</p>
                  </div>
 
                  <div className="text-center group">
@@ -175,9 +187,7 @@ export const BrandStory: React.FC = () => {
                         <Package size={36} />
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Sản Xuất An Toàn</h4>
-                    <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Nhà máy đạt chuẩn ISO 22000, quy trình khép kín đảm bảo vệ sinh an toàn thực phẩm, giữ nguyên hương vị tự nhiên.
-                    </p>
+                    <p className="text-gray-500 text-sm px-4">Nhà máy ISO 22000, quy trình khép kín giữ nguyên hương vị.</p>
                  </div>
              </div>
         </div>
