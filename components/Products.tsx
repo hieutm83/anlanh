@@ -209,7 +209,7 @@ const handleAddToCart = () => {
   };
 
   return (
-    <section id="products" className="py-16 bg-[#FDFBF7]">
+    <section id="products" className="py-16 bg-[#F3F0E9]">
       <div className="container mx-auto px-4">
         <div className="text-center mb-10">
           <span className="text-brand font-bold uppercase tracking-widest text-xs mb-2 block">Bộ Sưu Tập</span>
