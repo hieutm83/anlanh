@@ -71,7 +71,7 @@ export const BrandStory: React.FC = () => {
           <h2 className="text-3xl md:text-5xl font-serif font-bold text-brand mb-6">Ngũ Hành Dưỡng Thân</h2>
           <div className="w-24 h-1 bg-brand-accent mx-auto mb-8 rounded-full"></div>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Trên những mảnh vườn Việt, nơi người nông dân vẫn hái lá vào buổi sớm mai, 
+            Trên những cánh rừng Việt, nơi người nông dân vẫn hái lá thảo mộc vào buổi sớm mai, 
             những cây thảo mộc quen thuộc như lá ổi, lá sen, giảo cổ lam, gừng... 
             được gìn giữ và phối hòa thành tách trà lành của An Lành Farm.
             <br/><br/>
@@ -115,7 +115,7 @@ export const BrandStory: React.FC = () => {
                     An Lành Farm ra đời không chỉ là một thương hiệu trà, mà là một lời nhắc nhở về lối sống chậm. Giữa nhịp sống hối hả của đô thị, chúng tôi khao khát mang đến những tách trà gói trọn hương vị của đất trời, của sương sớm và nắng ấm.
                 </p>
                 <p className="text-gray-600 leading-relaxed mb-8 text-justify">
-                    Mỗi lá trà được hái xuống, mỗi mẻ sấy được thực hiện, đều chứa đựng tâm huyết của người nông dân Việt, mong muốn gửi gắm sự an lành đến từng tế bào trong cơ thể bạn.
+                    Mỗi lá thảo mộc được hái, mỗi mẻ sấy được thực hiện, đều chứa đựng tâm huyết của người nông dân Việt, mong muốn gửi gắm sự an lành đến từng tế bào trong cơ thể bạn.
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -154,7 +154,7 @@ export const BrandStory: React.FC = () => {
                     </div>
                     <h4 className="text-xl font-bold text-gray-800 mb-3">Nguyên Liệu Sạch</h4>
                     <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Thảo mộc được trồng tại các vùng nguyên liệu chuẩn VietGAP, thu hái đúng thời điểm để giữ trọn dược tính quý giá.
+                        Thảo mộc được tại các vùng nguyên liệu chuẩn VietGAP, thu hái đúng thời điểm để giữ trọn dược tính quý giá.
                     </p>
                  </div>
 
