@@ -11,7 +11,7 @@ interface HeaderProps {
   onOpenLookup: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ cartCount, onOpenCart, onOpenLookup }) => {
+export const Header: React.FC<HeaderProps> = ({ cartCount, onOpenCart, onOpenLookup }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -210,7 +210,7 @@ const POLICY_CONTENT = {
 }
 
 // --- PHẦN FOOTER ---
-const Footer: React.FC = () => {
+export const Footer: React.FC = () => {
   const [activePolicy, setActivePolicy] = useState<'shipping' | 'terms' | null>(null);
 
   const scrollTo = (id: string) => {
