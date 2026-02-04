@@ -1,7 +1,8 @@
 import { Product } from './types';
 
 // Helper to construct paths
-// Lưu ý: Đảm bảo bạn đã đổi tên folder trong public/image thành: thu-da, khoi-an, an-hoa
+// Vẫn giữ hàm này cho các ảnh SKU Combo (vì chưa có link online), 
+// nhưng các ảnh chính đã được thay bằng link trực tiếp.
 const getPath = (folder: string, file: string) => `/image/${folder}/${file}`;
 
 export const PRODUCTS: Product[] = [
@@ -16,21 +17,21 @@ export const PRODUCTS: Product[] = [
     benefits: ['Thư giãn thần kinh', 'Ngủ sâu, ngon giấc', 'Giảm căng thẳng mệt mỏi'],
     price: 139000,
     colorClass: 'text-indigo-800 bg-indigo-50 border-indigo-200',
-    video: '', // Chưa có file video, để trống
-    image: getPath('thu-da', '1.jpeg'), // Ảnh đại diện lấy ảnh số 1
+    video: 'https://down-tx-sg.vod.susercontent.com/api/v4/11110105/mms/vn-11110105-6v8gy-mh2wesvpa2h4ee.16000081763180940.mp4',
+    image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjnn68tjn4zq49.webp',
     gallery: [
-      getPath('thu-da', '1.jpeg'),
-      getPath('thu-da', '2.jpeg'),
-      getPath('thu-da', '3.jpeg'),
-      getPath('thu-da', '4.jpeg'),
-      getPath('thu-da', '5.jpeg'),
-      getPath('thu-da', '6.jpeg'),
-      getPath('thu-da', '7.jpeg'),
-      getPath('thu-da', '8.jpeg'),
-      getPath('thu-da', '9.jpeg'),
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjnn68tjn4zq49.webp', // 1
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ndeivdtzb72.webp', // 2
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ndeiv2lflcd.webp', // 3
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3nf1qeqcjl12.webp', // 4
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3nf4mikj5ued.webp', // 5
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3nf7mvft3ad9.webp', // 6
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngcbsao059b.webp', // 7
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngf41w4jo29.webp', // 8
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngi3w9lad8a.webp', // 9
     ],
     skuImages: {
-      // Dựa trên file upload: Thư dạ dùng đuôi .png
+      // Vì bạn chưa gửi link cho ảnh SKU Combo, mình vẫn giữ đường dẫn cũ
       combo2: getPath('thu-da', 'sku combo 2.png'),
       combo3: getPath('thu-da', 'sku combo 3.png')
     }
@@ -46,21 +47,20 @@ export const PRODUCTS: Product[] = [
     benefits: ['Thanh gan, giải độc', 'Giảm nóng trong', 'Khởi đầu nhẹ nhàng', 'Hỗ trợ chức năng gan'],
     price: 139000,
     colorClass: 'text-green-600 bg-green-50 border-green-200',
-    video: '',
-    image: getPath('khoi-an', '1.jpeg'),
+    video: 'https://down-zl-sg.vod.susercontent.com/api/v4/11110105/mms/vn-11110105-6v8gy-mjpc4thy1a86cd.16000101768897615.mp4',
+    image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjzbhsuihi4n00.webp',
     gallery: [
-      getPath('khoi-an', '1.jpeg'), 
-      getPath('khoi-an', '2.jpeg'), 
-      getPath('khoi-an', '3.jpeg'), 
-      getPath('khoi-an', '4.jpeg'), 
-      getPath('khoi-an', '5.jpeg'), 
-      getPath('khoi-an', '6.jpeg'), 
-      getPath('khoi-an', '7.jpeg'),
-      getPath('khoi-an', '8.jpeg'),
-      getPath('khoi-an', '9.jpeg'),
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjzbhsuihi4n00.webp', // 1
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi5ns2wgzp6f.webp', // 2
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi5qg7epl171.webp', // 3
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi95dk97utb9.webp', // 4
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi98qpp5ad76.webp', // 5
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi9b33bmyr1c.webp', // 6
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngcbsao059b.webp', // 7 (dùng chung)
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngf41w4jo29.webp', // 8 (dùng chung)
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngi3w9lad8a.webp', // 9 (dùng chung)
     ],
     skuImages: {
-      // Dựa trên file upload: Khởi an dùng đuôi .jpeg
       combo2: getPath('khoi-an', 'sku combo 2.jpeg'),
       combo3: getPath('khoi-an', 'sku combo 3.jpeg')
     }
@@ -76,21 +76,20 @@ export const PRODUCTS: Product[] = [
     benefits: ['Hỗ trợ giảm mỡ máu', 'Thanh lọc cơ thể', 'Giảm cảm giác nặng bụng', 'Cải thiện vóc dáng'],
     price: 139000,
     colorClass: 'text-lime-600 bg-lime-50 border-lime-200',
-    video: '',
-    image: getPath('an-hoa', '1.jpeg'),
+    video: '', // Chưa có video
+    image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjtloy00b2875d.webp',
     gallery: [
-      getPath('an-hoa', '1.jpeg'), 
-      getPath('an-hoa', '2.jpeg'), 
-      getPath('an-hoa', '3.jpeg'), 
-      getPath('an-hoa', '4.jpeg'), 
-      getPath('an-hoa', '5.jpeg'), 
-      getPath('an-hoa', '6.jpeg'), 
-      getPath('an-hoa', '7.jpeg'),
-      getPath('an-hoa', '8.jpeg'),
-      getPath('an-hoa', '9.jpeg'),
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjtloy00b2875d.webp', // 1
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz63lkpoj7e.webp', // 2
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62rx62t82.webp', // 3
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62sjn5wd2.webp', // 4
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62zj2tc5a.webp', // 5
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62rkiyr3b.webp', // 6
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngcbsao059b.webp', // 7 (dùng chung)
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngf41w4jo29.webp', // 8 (dùng chung)
+      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ngi3w9lad8a.webp', // 9 (dùng chung)
     ],
     skuImages: {
-      // Dựa trên file upload: An hòa dùng đuôi .png
       combo2: getPath('an-hoa', 'sku combo 2.png'),
       combo3: getPath('an-hoa', 'sku combo 3.png')
     }
