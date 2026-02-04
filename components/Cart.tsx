@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 import { CartItem, OrderForm } from '../types';
 
 // --- CẤU HÌNH API MỚI ---
-const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbyz5y92pukPPqW1dtBXvnshb6St9eyTiYJ-WhrTYXozGRCJXkvBHAn75VCtyTVa-xtR/exec";
+const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbzCzJ2SQ3iPmiJZNKg5k6Ti_9Y6EI79bLmVyhhQmBkPbSfFVga2f4hva_3-_2H-7h3k/exec";
 
 // Định nghĩa kiểu dữ liệu Voucher động từ API
 interface Voucher {
