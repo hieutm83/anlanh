@@ -2,10 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Trash2, ShoppingBag, Truck, MapPin, AlertCircle, Loader2, Camera, Tag, Ticket, Zap, Check, Lock, Info, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { CartItem, OrderForm } from '../types';
-import { VOUCHERS, Voucher } from './Vouchers';
 
-// --- CẤU HÌNH API ---
-const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbzy0_bld3XYKk1136lT46CDYM4D3jhs-zxUrMf8R5wfsEOLKvzBI5m0dnQkS5o02zDG/exec";
+// --- CẤU HÌNH API MỚI ---
+const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbyz5y92pukPPqW1dtBXvnshb6St9eyTiYJ-WhrTYXozGRCJXkvBHAn75VCtyTVa-xtR/exec";
+
+// Định nghĩa kiểu dữ liệu Voucher động từ API
+interface Voucher {
+  code: string;
+  type: 'shipping' | 'discount';
+  value: number;
+  minCondition: number; // shipping: số hộp tối thiểu | discount: tổng tiền tối thiểu
+  description: string;
+}
 
 interface CartProps {
   isOpen: boolean;
@@ -16,70 +24,67 @@ interface CartProps {
   onClearCart: () => void;
 }
 
-// Danh sách từ khóa các tỉnh miền Bắc để tính ship 15k
-const NORTHERN_KEYWORDS = [
-    "hà nội", "ha noi", "hải phòng", "hai phong", "quảng ninh", "quang ninh", 
-    "hải dương", "hai duong", "bắc ninh", "bac ninh", "thái nguyên", "thai nguyen",
-    "nam định", "nam dinh", "thái bình", "thai binh", "hưng yên", "hung yen",
-    "vĩnh phúc", "vinh phuc", "phú thọ", "phu tho", "bắc giang", "bac giang",
-    "hòa bình", "hoa binh", "hà nam", "ha nam", "yên bái", "yen bai",
-    "tuyên quang", "lào cai", "lao cai", "điện biên", "dien bien",
-    "lai châu", "lai chau", "sơn la", "son la", "hà giang", "ha giang",
-    "cao bằng", "cao bang", "bắc kạn", "bac kan", "lạng sơn", "lang son",
-    "ninh bình", "ninh binh"
-];
+const NORTHERN_KEYWORDS = ["hà nội", "ha noi", "hải phòng", "hai phong", "quảng ninh", "quang ninh", "hải dương", "hai duong", "bắc ninh", "bac ninh", "thái nguyên", "thai nguyen", "nam định", "nam dinh", "thái bình", "thai binh", "hưng yên", "hung yen", "vĩnh phúc", "vinh phuc", "phú thọ", "phu tho", "bắc giang", "bac giang", "hòa bình", "hoa binh", "hà nam", "ha nam", "yên bái", "yen bai", "tuyên quang", "lào cai", "lao cai", "điện biên", "dien bien", "lai châu", "lai chau", "sơn la", "son la", "hà giang", "ha giang", "cao bằng", "cao bang", "bắc kạn", "bac kan", "lạng sơn", "lang son", "ninh bình", "ninh binh"];
 
-// Hàm thiết lập Cookie
 function setCookie(name: string, value: string, days: number) {
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
     document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 }
 
-export const CartSidebar: React.FC<CartProps> = ({ 
-  isOpen, onClose, cart, onRemove, onUpdateQuantity, onClearCart 
-}) => {
+export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemove, onUpdateQuantity, onClearCart }) => {
   // --- FIX LỖI CUỘN TRANG ---
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (isOpen) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  const [formData, setFormData] = useState<OrderForm>({
-    fullName: '',
-    phone: '',
-    address: '',
-    note: ''
-  });
+  const [formData, setFormData] = useState<OrderForm>({ fullName: '', phone: '', address: '', note: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState('');
   const [error, setError] = useState<string | null>(null);
   
+  // --- STATE DỮ LIỆU VOUCHER ĐỘNG TỪ SHEET ---
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
+
   // Voucher Logic States
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [appliedDiscountVoucher, setAppliedDiscountVoucher] = useState<Voucher | null>(null);
   const [appliedShippingVoucher, setAppliedShippingVoucher] = useState<Voucher | null>(null);
   const [manualVoucherError, setManualVoucherError] = useState<string | null>(null);
 
-  // State và Ref cho chức năng chụp màn hình
   const [isCapturing, setIsCapturing] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to check if location is in North
+  // 1. Fetch Voucher từ Google Sheet khi mở giỏ hàng
+  useEffect(() => {
+      const fetchVouchers = async () => {
+          setIsLoadingVouchers(true);
+          try {
+              const response = await fetch(`${GOOGLE_SHEET_API_URL}?action=get_vouchers`);
+              const json = await response.json();
+              if (json.success && Array.isArray(json.data)) {
+                  setVouchers(json.data);
+              }
+          } catch (e) {
+              console.error("Lỗi lấy voucher:", e);
+          } finally {
+              setIsLoadingVouchers(false);
+          }
+      };
+      
+      // Chỉ fetch khi mở giỏ hàng và chưa có dữ liệu (hoặc muốn refresh mỗi lần mở thì bỏ điều kiện vouchers.length)
+      if (isOpen && vouchers.length === 0) fetchVouchers();
+  }, [isOpen]);
+
   const isNorthernLocation = (address: string) => {
       if (!address) return false;
-      const lowerAddr = address.toLowerCase();
-      return NORTHERN_KEYWORDS.some(kw => lowerAddr.includes(kw));
+      return NORTHERN_KEYWORDS.some(kw => address.toLowerCase().includes(kw));
   };
 
-  // Helper to calculate total equivalent boxes
   const calculateTotalBoxes = (cartItems: CartItem[]) => {
       return cartItems.reduce((sum, item) => {
           let multiplier = 1;
@@ -89,182 +94,115 @@ export const CartSidebar: React.FC<CartProps> = ({
       }, 0);
   };
 
-  // Logic tính giá
   const calculateItemTotal = (item: CartItem) => {
     const baseTotal = item.price * item.quantity;
-    
     if (!item.variantName || item.variantName === '1 Hộp') {
-        if (item.quantity >= 3) {
-            return { total: baseTotal * 0.9, discount: 10, originalTotal: baseTotal };
-        } else if (item.quantity === 2) {
-            return { total: baseTotal * 0.95, discount: 5, originalTotal: baseTotal };
-        }
+        if (item.quantity >= 3) return { total: baseTotal * 0.9, discount: 10, originalTotal: baseTotal };
+        else if (item.quantity === 2) return { total: baseTotal * 0.95, discount: 5, originalTotal: baseTotal };
     }
-    
     return { total: baseTotal, discount: 0, originalTotal: baseTotal };
   };
 
-  // Tính toán tổng giỏ hàng
   const subtotal = cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0);
   const totalBoxes = calculateTotalBoxes(cart);
-  
-  // Base Shipping Fee
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- AUTO APPLY LOGIC ---
+  // --- LOGIC TỰ ĐỘNG ÁP DỤNG VOUCHER (DỰA TRÊN DỮ LIỆU ĐỘNG) ---
   useEffect(() => {
-    if (cart.length === 0) {
+    if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
         setAppliedShippingVoucher(null);
         return;
     }
 
-    // 1. Logic Vận Chuyển
-    if (totalBoxes >= 2) {
-        const freeshipVoucher = VOUCHERS.find(v => v.code === 'FREESHIP');
-        if (freeshipVoucher) setAppliedShippingVoucher(freeshipVoucher);
-    } else {
-        setAppliedShippingVoucher(null);
-    }
+    // 1. Tìm Voucher Vận Chuyển tốt nhất (Active & Đủ điều kiện)
+    const shippingCandidates = vouchers.filter(v => 
+        v.type === 'shipping' && totalBoxes >= v.minCondition
+    ).sort((a, b) => b.value - a.value); // Ưu tiên giảm nhiều nhất
 
-    // 2. Logic Giảm Giá
-    let bestDiscountVoucher: Voucher | null = null;
-    let maxDiscountAmount = 0;
+    setAppliedShippingVoucher(shippingCandidates.length > 0 ? shippingCandidates[0] : null);
 
-    if (subtotal >= 200000) {
-        const chao30 = VOUCHERS.find(v => v.code === 'CHAO30');
-        if (chao30 && 30000 > maxDiscountAmount) {
-            maxDiscountAmount = 30000;
-            bestDiscountVoucher = chao30;
-        }
-    }
+    // 2. Tìm Voucher Giảm Giá tốt nhất (Active & Đủ điều kiện)
+    const discountCandidates = vouchers.filter(v => 
+        v.type === 'discount' && subtotal >= v.minCondition
+    ).sort((a, b) => b.value - a.value); // Ưu tiên giảm nhiều nhất
 
-    const tet = VOUCHERS.find(v => v.code === 'TETANLANH');
-    if (tet) {
-        const tetAmount = subtotal * 0.1;
-        if (tetAmount > maxDiscountAmount) {
-            maxDiscountAmount = tetAmount;
-            bestDiscountVoucher = tet;
-        }
-    }
+    setAppliedDiscountVoucher(discountCandidates.length > 0 ? discountCandidates[0] : null);
 
-    setAppliedDiscountVoucher(bestDiscountVoucher);
-
-  }, [cart, subtotal, totalBoxes, formData.address]);
+  }, [cart, subtotal, totalBoxes, formData.address, vouchers]);
 
   
-  // Calculate final amounts
+  // Tính toán tiền cuối cùng
   let shippingDiscountAmount = 0;
   if (appliedShippingVoucher) {
-      shippingDiscountAmount = baseShippingFee; 
+      // Giảm tối đa bằng phí ship hiện tại (tránh âm tiền ship)
+      shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
   }
 
   let productDiscountAmount = 0;
   if (appliedDiscountVoucher) {
-      if (appliedDiscountVoucher.code === 'CHAO30') {
-          productDiscountAmount = 30000;
-      } else if (appliedDiscountVoucher.code === 'TETANLANH') {
-          productDiscountAmount = subtotal * 0.1;
-      }
+      productDiscountAmount = appliedDiscountVoucher.value;
   }
 
   const finalShippingFee = Math.max(0, baseShippingFee - shippingDiscountAmount);
   const finalTotal = Math.max(0, subtotal + finalShippingFee - productDiscountAmount);
 
-  // --- Helper to check voucher eligibility status for UI ---
+  // --- Helper UI Voucher ---
   const getVoucherStatus = (voucher: Voucher) => {
       if (voucher.type === 'shipping') {
-          const eligible = totalBoxes >= 2;
+          const eligible = totalBoxes >= voucher.minCondition;
           return {
               eligible,
-              missingText: eligible ? '' : `Mua thêm ${2 - totalBoxes} hộp để Freeship`,
-              progress: eligible ? 100 : (totalBoxes / 2) * 100
+              missingText: eligible ? '' : `Mua thêm ${voucher.minCondition - totalBoxes} hộp`,
+              progress: eligible ? 100 : (totalBoxes / voucher.minCondition) * 100
           };
-      } else if (voucher.code === 'CHAO30') {
-          const eligible = subtotal >= 200000;
-          const missing = 200000 - subtotal;
+      } else {
+          // Discount voucher
+          const eligible = subtotal >= voucher.minCondition;
+          const missing = voucher.minCondition - subtotal;
           return {
               eligible,
-              missingText: eligible ? '' : `Mua thêm ${missing.toLocaleString('vi-VN')}đ để dùng mã`,
-              progress: eligible ? 100 : (subtotal / 200000) * 100
+              missingText: eligible ? '' : `Mua thêm ${missing.toLocaleString('vi-VN')}đ`,
+              progress: eligible ? 100 : (subtotal / voucher.minCondition) * 100
           };
-      } else if (voucher.code === 'TETANLANH') {
-          return { eligible: true, missingText: '', progress: 100 };
       }
-      return { eligible: true, missingText: '', progress: 100 };
   };
 
   const handleManualApply = () => {
     const code = voucherCodeInput.trim().toUpperCase();
     if(!code) return;
-    setManualVoucherError("Mã không tồn tại hoặc đã hết hạn.");
-  }
+    
+    // Tìm trong danh sách vouchers tải về
+    const found = vouchers.find(v => v.code === code);
+    
+    if (!found) {
+        setManualVoucherError("Mã không tồn tại.");
+        return;
+    }
+
+    const status = getVoucherStatus(found);
+    if (!status.eligible) {
+        setManualVoucherError(`Chưa đủ điều kiện: ${status.missingText}`);
+        return;
+    }
+
+    if (found.type === 'shipping') setAppliedShippingVoucher(found);
+    else setAppliedDiscountVoucher(found);
+    
+    setVoucherCodeInput('');
+    setManualVoucherError(null);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
     if (name === 'fullName') {
-        const textOnly = value.replace(/[0-9!@#$%^&*()_+={}\[\]|\\:;"'<>,.?/]/g, '');
-        setFormData(prev => ({ ...prev, [name]: textOnly }));
-    } 
-    else if (name === 'phone') {
-        let numbers = value.replace(/\D/g, '');
-        if (numbers.length > 0 && numbers[0] !== '0') {
-            numbers = '0' + numbers;
-        }
-        const truncated = numbers.slice(0, 10);
-        let formatted = truncated;
-        if (truncated.length > 7) {
-            formatted = `${truncated.slice(0, 4)} ${truncated.slice(4, 7)} ${truncated.slice(7)}`;
-        } else if (truncated.length > 4) {
-            formatted = `${truncated.slice(0, 4)} ${truncated.slice(4)}`;
-        }
-        setFormData(prev => ({ ...prev, [name]: formatted }));
-    }
-    else {
+        setFormData(prev => ({ ...prev, [name]: value.replace(/[0-9!@#$%^&*()_+={}\[\]|\\:;"'<>,.?/]/g, '') }));
+    } else if (name === 'phone') {
+        setFormData(prev => ({ ...prev, [name]: value.replace(/\D/g, '').slice(0, 12) }));
+    } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
     if (error) setError(null);
-  };
-  
-  const submitOrderToBackend = async (data: any) => {
-    if (GOOGLE_SHEET_API_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
-        console.warn("Chưa cấu hình Google Apps Script URL trong Cart.tsx");
-        return new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
-    try {
-        await fetch(GOOGLE_SHEET_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        });
-        return true;
-    } catch (error) {
-        console.error("Lỗi gửi đơn hàng:", error);
-        throw error;
-    }
-  };
-
-  const saveOrderLocally = (orderData: any) => {
-      setCookie('last_order_id', orderData.orderId, 7);
-      const savedOrders = JSON.parse(localStorage.getItem('anlanh_local_orders') || '[]');
-      const lookupFormat = {
-          id: orderData.orderId,
-          status: 'pending',
-          statusText: 'Đang xử lý',
-          customerName: orderData.customer.fullName,
-          phone: orderData.customer.phone.trim(),
-          total: orderData.totalAmount,
-          createdAt: new Date().toLocaleDateString('vi-VN'),
-          items: orderData.items.map((item: any) => `${item.name} (${item.variant}) - SL: ${item.quantity}`)
-      };
-      savedOrders.unshift(lookupFormat);
-      if (savedOrders.length > 20) savedOrders.pop();
-      localStorage.setItem('anlanh_local_orders', JSON.stringify(savedOrders));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -273,25 +211,21 @@ export const CartSidebar: React.FC<CartProps> = ({
 
     const rawPhone = formData.phone.replace(/\s/g, '');
     if (!/^0\d{9}$/.test(rawPhone)) {
-        setError('Số điện thoại không hợp lệ. Vui lòng nhập đúng 10 số và bắt đầu bằng số 0.');
+        setError('Số điện thoại không hợp lệ (cần 10 số, bắt đầu bằng 0).');
         return;
     }
 
     setIsSubmitting(true);
-    setError(null);
     
     const newOrderId = `ORD-${Date.now().toString().slice(-6)}`;
-    const orderItems = cart.map(item => {
-        const { total: itemTotal } = calculateItemTotal(item);
-        return {
-            id: item.id,
-            name: item.name,
-            variant: item.variantName || '1 Hộp',
-            price: item.price,
-            quantity: item.quantity,
-            subtotal: itemTotal
-        };
-    });
+    const orderItems = cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        variant: item.variantName || '1 Hộp',
+        price: item.price,
+        quantity: item.quantity,
+        subtotal: calculateItemTotal(item).total
+    }));
 
     const voucherCodes = [];
     if (appliedShippingVoucher) voucherCodes.push(appliedShippingVoucher.code);
@@ -311,22 +245,36 @@ export const CartSidebar: React.FC<CartProps> = ({
     };
 
     try {
-      await submitOrderToBackend(orderPayload);
-      saveOrderLocally(orderPayload);
-      setSuccessOrderId(newOrderId);
-      setOrderSuccess(true);
-      onClearCart();
-      setFormData({ fullName: '', phone: '', address: '', note: '' });
-      setAppliedDiscountVoucher(null);
-      setAppliedShippingVoucher(null);
+        await fetch(GOOGLE_SHEET_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderPayload)
+        });
+        
+        setCookie('last_order_id', newOrderId, 7);
+        const savedOrders = JSON.parse(localStorage.getItem('anlanh_local_orders') || '[]');
+        savedOrders.unshift({
+             id: newOrderId, status: 'pending', statusText: 'Đang xử lý',
+             customerName: formData.fullName, phone: rawPhone, total: finalTotal,
+             createdAt: new Date().toLocaleDateString('vi-VN'),
+             items: orderItems.map((i:any) => `${i.name} (${i.variant}) x${i.quantity}`)
+        });
+        localStorage.setItem('anlanh_local_orders', JSON.stringify(savedOrders));
+
+        setSuccessOrderId(newOrderId);
+        setOrderSuccess(true);
+        onClearCart();
+        setFormData({ fullName: '', phone: '', address: '', note: '' });
+        setAppliedDiscountVoucher(null);
+        setAppliedShippingVoucher(null);
     } catch (err) {
-      console.error('Order submission failed:', err);
-      saveOrderLocally(orderPayload);
-      setSuccessOrderId(newOrderId);
-      setOrderSuccess(true);
-      onClearCart();
+        console.error(err);
+        setSuccessOrderId(newOrderId);
+        setOrderSuccess(true);
+        onClearCart();
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
 
@@ -342,25 +290,14 @@ export const CartSidebar: React.FC<CartProps> = ({
           setIsCapturing(true);
           try {
               await new Promise(resolve => setTimeout(resolve, 100));
-              const canvas = await html2canvas(receiptRef.current, {
-                  scale: 2,
-                  backgroundColor: '#ffffff',
-                  logging: false
-              });
-              const image = canvas.toDataURL("image/png");
+              const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
               const link = document.createElement('a');
-              link.href = image;
+              link.href = canvas.toDataURL("image/png");
               link.download = `Don-hang-${successOrderId}.png`;
               link.click();
               setTimeout(() => { setIsCapturing(false); closeCart(); }, 800);
-          } catch (e) {
-              console.error("Lỗi chụp màn hình:", e);
-              setIsCapturing(false);
-              closeCart();
-          }
-      } else {
-          closeCart();
-      }
+          } catch (e) { setIsCapturing(false); closeCart(); }
+      } else { closeCart(); }
   };
 
   return (
@@ -378,8 +315,8 @@ export const CartSidebar: React.FC<CartProps> = ({
 
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar overscroll-contain">
           {orderSuccess ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in">
-              <div ref={receiptRef} className="w-full flex flex-col items-center p-6 bg-white rounded-xl">
+            <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in">
+               <div ref={receiptRef} className="w-full flex flex-col items-center p-6 bg-white rounded-xl">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2 shadow-sm"><Truck size={40} /></div>
                   <h3 className="text-2xl font-serif font-bold text-gray-800">Đặt hàng thành công!</h3>
                   <p className="text-gray-500 max-w-xs mx-auto text-sm mb-4">Cảm ơn bạn đã tin chọn An Lành Farm.</p>
@@ -442,94 +379,96 @@ export const CartSidebar: React.FC<CartProps> = ({
                 })}
               </div>
 
-               {/* --- VOUCHER SECTION --- */}
+               {/* --- VOUCHER SECTION (Dynamic from Sheet) --- */}
                <div className="border-t border-gray-100 pt-6">
                     <h3 className="font-serif font-bold text-sm mb-3 flex items-center gap-2 text-gray-700">
                         <Ticket size={18} className="text-brand" /> Ưu đãi cho bạn
                     </h3>
                     
-                    {/* List Shipping Vouchers */}
-                    <div className="mb-4">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã vận chuyển</p>
-                        <div className="space-y-2">
-                             {VOUCHERS.filter(v => v.type === 'shipping').map(voucher => {
-                                 const status = getVoucherStatus(voucher);
-                                 const isApplied = appliedShippingVoucher?.code === voucher.code;
-
-                                 return (
-                                     <div key={voucher.id} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
-                                             <div className="flex items-start gap-3">
-                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
-                                                     <Truck size={20} />
-                                                 </div>
-                                                 <div className="flex-1">
-                                                     <div className="flex items-center justify-between">
-                                                         <h4 className={`font-bold text-sm ${isApplied ? 'text-blue-800' : 'text-gray-700'}`}>{voucher.code}</h4>
-                                                         {isApplied && <Check size={18} className="text-blue-600" />}
-                                                         {!status.eligible && <Lock size={16} className="text-gray-300" />}
-                                                     </div>
-                                                     <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
-                                                     
-                                                     {!status.eligible && (
-                                                         <div className="mt-2 bg-gray-100 rounded-full h-1.5 w-full overflow-hidden">
-                                                             <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${status.progress}%` }}></div>
-                                                         </div>
-                                                     )}
-                                                     {!status.eligible && (
-                                                         <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1">
-                                                             <Info size={10} /> {status.missingText}
-                                                         </p>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                     </div>
-                                 )
-                             })}
+                    {isLoadingVouchers ? (
+                        <div className="text-center py-4 text-gray-400 text-xs flex justify-center items-center gap-2">
+                            <Loader2 size={16} className="animate-spin" /> Đang tải mã giảm giá...
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            {/* List Shipping Vouchers */}
+                            <div className="mb-4">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã vận chuyển</p>
+                                <div className="space-y-2">
+                                    {vouchers.filter(v => v.type === 'shipping').map(voucher => {
+                                        const status = getVoucherStatus(voucher);
+                                        const isApplied = appliedShippingVoucher?.code === voucher.code;
+                                        return (
+                                            <div key={voucher.code} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
+                                                        <Truck size={20} />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className={`font-bold text-sm ${isApplied ? 'text-blue-800' : 'text-gray-700'}`}>{voucher.code}</h4>
+                                                            {isApplied && <Check size={18} className="text-blue-600" />}
+                                                            {!status.eligible && <Lock size={16} className="text-gray-300" />}
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
+                                                        {!status.eligible && (
+                                                            <>
+                                                                <div className="mt-2 bg-gray-100 rounded-full h-1.5 w-full overflow-hidden">
+                                                                    <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${status.progress}%` }}></div>
+                                                                </div>
+                                                                <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1"><Info size={10} /> {status.missingText}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                    {vouchers.filter(v => v.type === 'shipping').length === 0 && <p className="text-xs text-gray-400 italic">Không có mã vận chuyển.</p>}
+                                </div>
+                            </div>
 
-                    {/* List Discount Vouchers */}
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã giảm giá</p>
-                        <div className="space-y-2">
-                            {VOUCHERS.filter(v => v.type === 'discount').map(voucher => {
-                                 const status = getVoucherStatus(voucher);
-                                 const isApplied = appliedDiscountVoucher?.code === voucher.code;
-                                 
-                                 return (
-                                     <div key={voucher.id} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-                                             <div className="flex items-start gap-3">
-                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-green-200 text-green-700' : status.eligible ? 'bg-orange-50 text-orange-400' : 'bg-gray-100 text-gray-400'}`}>
-                                                     <Zap size={20} />
-                                                 </div>
-                                                 <div className="flex-1">
-                                                     <div className="flex items-center justify-between">
-                                                         <div className="flex items-center gap-2">
-                                                             <h4 className={`font-bold text-sm ${isApplied ? 'text-green-800' : 'text-gray-700'}`}>{voucher.code}</h4>
-                                                             {isApplied && <span className="text-[10px] bg-green-600 text-white px-1.5 rounded font-bold">Tốt nhất</span>}
-                                                         </div>
-                                                         {isApplied && <Check size={18} className="text-green-600" />}
-                                                         {!status.eligible && <Lock size={16} className="text-gray-300" />}
-                                                     </div>
-                                                     <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
-                                                     
-                                                     {!status.eligible && (
-                                                         <div className="mt-2 bg-gray-100 rounded-full h-1.5 w-full overflow-hidden">
-                                                             <div className="h-full bg-orange-400 transition-all duration-500" style={{ width: `${status.progress}%` }}></div>
-                                                         </div>
-                                                     )}
-                                                     {!status.eligible && (
-                                                         <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1">
-                                                             <Info size={10} /> {status.missingText}
-                                                         </p>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                     </div>
-                                 )
-                            })}
-                        </div>
-                    </div>
+                            {/* List Discount Vouchers */}
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã giảm giá</p>
+                                <div className="space-y-2">
+                                    {vouchers.filter(v => v.type === 'discount').map(voucher => {
+                                        const status = getVoucherStatus(voucher);
+                                        const isApplied = appliedDiscountVoucher?.code === voucher.code;
+                                        return (
+                                            <div key={voucher.code} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-green-200 text-green-700' : status.eligible ? 'bg-orange-50 text-orange-400' : 'bg-gray-100 text-gray-400'}`}>
+                                                        <Zap size={20} />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className={`font-bold text-sm ${isApplied ? 'text-green-800' : 'text-gray-700'}`}>{voucher.code}</h4>
+                                                                {isApplied && <span className="text-[10px] bg-green-600 text-white px-1.5 rounded font-bold">Tốt nhất</span>}
+                                                            </div>
+                                                            {isApplied && <Check size={18} className="text-green-600" />}
+                                                            {!status.eligible && <Lock size={16} className="text-gray-300" />}
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
+                                                        {!status.eligible && (
+                                                            <>
+                                                                <div className="mt-2 bg-gray-100 rounded-full h-1.5 w-full overflow-hidden">
+                                                                    <div className="h-full bg-orange-400 transition-all duration-500" style={{ width: `${status.progress}%` }}></div>
+                                                                </div>
+                                                                <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1"><Info size={10} /> {status.missingText}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                    {vouchers.filter(v => v.type === 'discount').length === 0 && <p className="text-xs text-gray-400 italic">Không có mã giảm giá.</p>}
+                                </div>
+                            </div>
+                        </>
+                    )}
                     
                     {/* Manual Input */}
                     <div className="mt-4 flex gap-2">
@@ -559,14 +498,13 @@ export const CartSidebar: React.FC<CartProps> = ({
                 <h3 className="font-serif font-bold text-lg mb-4 flex items-center gap-2"><MapPin size={18} className="text-brand" /> Thông tin giao hàng</h3>
                 {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-start gap-2 mb-4 border border-red-100 animate-in fade-in slide-in-from-top-1"><AlertCircle size={16} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
                 
-                {/* --- ĐÃ SỬA: Dùng Input thường, xóa Autocomplete cũ --- */}
                 <form id="order-form" onSubmit={handleSubmit} className="space-y-4">
                   <div><input type="text" name="fullName" required placeholder="Họ và tên" value={formData.fullName} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all text-sm" /></div>
                   <div>
                     <input type="tel" name="phone" required inputMode="numeric" maxLength={12} placeholder="Số điện thoại" value={formData.phone} onFocus={() => { if (!formData.phone) setFormData(prev => ({ ...prev, phone: '0' })); }} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all text-sm" />
                   </div>
                   
-                  {/* Ô nhập địa chỉ cơ bản - Sau này tích hợp Goong.io vào đây */}
+                  {/* Ô nhập địa chỉ - Input thường */}
                   <div>
                     <input 
                         type="text" 
