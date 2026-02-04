@@ -289,7 +289,7 @@ export const Footer: React.FC = () => {
                     <ul className="space-y-4">
                         <li className="flex items-start gap-3 text-white/80">
                             <MapPin size={20} className="shrink-0 mt-1" />
-                            <span>Vùng nguyên liệu sạch Việt Nam</span>
+                            <span>Tầng 4, căn B15 khu nhà ở Hoàng Cầu, phường Đống Đa, Hà Nội</span>
                         </li>
                         <li className="flex items-center gap-3 text-white/80">
                             <Phone size={20} className="shrink-0" />
@@ -297,7 +297,7 @@ export const Footer: React.FC = () => {
                         </li>
                         <li className="flex items-center gap-3 text-white/80">
                             <Mail size={20} className="shrink-0" />
-                            <span>tmdt.kuma@gmail.com</span>
+                            <span>cskh@anlanhfarm.com</span>
                         </li>
                     </ul>
                 </div>
