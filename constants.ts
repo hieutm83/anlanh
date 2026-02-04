@@ -20,7 +20,6 @@ export const PRODUCTS: Product[] = [
     video: 'https://down-tx-sg.vod.susercontent.com/api/v4/11110105/mms/vn-11110105-6v8gy-mh2wesvpa2h4ee.16000081763180940.mp4',
     image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjnn68tjn4zq49.webp',
     gallery: [
-      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjnn68tjn4zq49.webp', // 1
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ndeivdtzb72.webp', // 2
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3ndeiv2lflcd.webp', // 3
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3nf1qeqcjl12.webp', // 4
@@ -50,7 +49,6 @@ export const PRODUCTS: Product[] = [
     video: 'https://down-zl-sg.vod.susercontent.com/api/v4/11110105/mms/vn-11110105-6v8gy-mjpc4thy1a86cd.16000101768897615.mp4',
     image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjzbhsuihi4n00.webp',
     gallery: [
-      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjzbhsuihi4n00.webp', // 1
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi5ns2wgzp6f.webp', // 2
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi5qg7epl171.webp', // 3
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjfi95dk97utb9.webp', // 4
@@ -79,7 +77,6 @@ export const PRODUCTS: Product[] = [
     video: '', // Chưa có video
     image: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjtloy00b2875d.webp',
     gallery: [
-      'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjtloy00b2875d.webp', // 1
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz63lkpoj7e.webp', // 2
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62rx62t82.webp', // 3
       'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj3oz62sjn5wd2.webp', // 4
