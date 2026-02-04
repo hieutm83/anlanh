@@ -7,8 +7,8 @@ interface OrderLookupProps {
   onClose: () => void;
 }
 
-// ✅ Link API của bạn đã được cập nhật
-const API_URL = "https://script.google.com/macros/s/AKfycbzy0_bld3XYKk1136lT46CDYM4D3jhs-zxUrMf8R5wfsEOLKvzBI5m0dnQkS5o02zDG/exec";
+// ✅ Đã cập nhật link Google Apps Script mới nhất của bạn
+const API_URL = "https://script.google.com/macros/s/AKfycbyz5y92pukPPqW1dtBXvnshb6St9eyTiYJ-WhrTYXozGRCJXkvBHAn75VCtyTVa-xtR/exec";
 
 export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => {
   const [orderId, setOrderId] = useState('');
@@ -22,9 +22,9 @@ export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Chuẩn hóa input
+    // Chuẩn hóa input: Viết hoa mã đơn, xóa khoảng trắng SĐT
     const cleanOrderId = orderId.trim().toUpperCase();
-    const cleanPhone = phone.trim().replace(/\s/g, ''); // Xóa khoảng trắng trong SĐT
+    const cleanPhone = phone.trim().replace(/\s/g, '');
 
     if (!cleanOrderId || !cleanPhone) {
         setError('Vui lòng nhập đầy đủ Mã đơn hàng và Số điện thoại');
@@ -36,7 +36,7 @@ export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => 
     setResult(null);
 
     try {
-        // Gọi API Google Apps Script
+        // Gọi API Google Apps Script với action=lookup
         const response = await fetch(`${API_URL}?action=lookup&orderId=${cleanOrderId}&phone=${cleanPhone}`);
         const data = await response.json();
 
@@ -48,7 +48,7 @@ export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => 
                 customerName: data.order.fullName,
                 total: Number(data.order.total),
                 createdAt: new Date(data.order.createdAt).toLocaleDateString('vi-VN'),
-                // Xử lý chuỗi items từ Sheet thành mảng để hiển thị
+                // Xử lý chuỗi items từ Sheet (nếu lưu dạng text xuống dòng \n thì tách ra mảng)
                 items: typeof data.order.items === 'string' 
                     ? data.order.items.split('\n') 
                     : [data.order.items]
@@ -77,6 +77,7 @@ export const OrderLookup: React.FC<OrderLookupProps> = ({ isOpen, onClose }) => 
 
   const getStatusStep = (status: string) => {
       const steps = ['pending', 'confirmed', 'shipping', 'completed'];
+      // Nếu hủy đơn thì trả về -1 để không sáng bước nào
       if (status === 'cancelled') return -1;
       return steps.indexOf(status);
   };
