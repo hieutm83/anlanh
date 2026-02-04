@@ -6,6 +6,7 @@ import { CartItem, OrderForm } from '../types';
 // --- CẤU HÌNH API ---
 const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbzCzJ2SQ3iPmiJZNKg5k6Ti_9Y6EI79bLmVyhhQmBkPbSfFVga2f4hva_3-_2H-7h3k/exec";
 
+// Interface
 interface Voucher {
   code: string;
   type: 'shipping' | 'discount';
@@ -14,7 +15,6 @@ interface Voucher {
   description: string;
 }
 
-// Interface giá sản phẩm
 interface ProductPrice {
     id: string;
     originalPrice: number;
@@ -55,11 +55,12 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const [successOrderId, setSuccessOrderId] = useState('');
   const [error, setError] = useState<string | null>(null);
   
+  // STATE QUẢN LÝ DỮ LIỆU TỪ SHEET
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  // Thêm state lưu bảng giá
   const [productPrices, setProductPrices] = useState<Record<string, ProductPrice>>({}); 
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true); // Mặc định đang load
 
+  // Voucher Input
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [appliedDiscountVoucher, setAppliedDiscountVoucher] = useState<Voucher | null>(null);
   const [appliedShippingVoucher, setAppliedShippingVoucher] = useState<Voucher | null>(null);
@@ -68,27 +69,33 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const [isCapturing, setIsCapturing] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  // FETCH DỮ LIỆU
+  // --- 1. FETCH DỮ LIỆU (CHẠY 1 LẦN KHI MỞ CART) ---
   useEffect(() => {
       const fetchData = async () => {
           setIsLoadingData(true);
           try {
-              // 1. Lấy Voucher
-              const voucherRes = await fetch(`${GOOGLE_SHEET_API_URL}?action=get_vouchers`);
+              // Gọi cả 2 API cùng lúc
+              const [voucherRes, productRes] = await Promise.all([
+                  fetch(`${GOOGLE_SHEET_API_URL}?action=get_vouchers`),
+                  fetch(`${GOOGLE_SHEET_API_URL}?action=get_products`)
+              ]);
+
               const voucherJson = await voucherRes.json();
+              const productJson = await productRes.json();
+
+              // Xử lý Voucher
               if (voucherJson.success && Array.isArray(voucherJson.data)) {
                   setVouchers(voucherJson.data);
               }
 
-              // 2. Lấy Bảng Giá Sản Phẩm
-              const productRes = await fetch(`${GOOGLE_SHEET_API_URL}?action=get_products`);
-              const productJson = await productRes.json();
+              // Xử lý Bảng Giá
               if (productJson.success && Array.isArray(productJson.data)) {
                   const map: Record<string, ProductPrice> = {};
                   productJson.data.forEach((p: ProductPrice) => {
                       map[p.id] = p;
                   });
                   setProductPrices(map);
+                  console.log("🔥 Bảng giá đã tải về:", map);
               }
 
           } catch (e) {
@@ -101,130 +108,90 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
       if (isOpen) fetchData();
   }, [isOpen]);
 
-  const isNorthernLocation = (address: string) => {
-      if (!address) return false;
-      return NORTHERN_KEYWORDS.some(kw => address.toLowerCase().includes(kw));
-  };
-
-  const calculateTotalBoxes = (cartItems: CartItem[]) => {
-      return cartItems.reduce((sum, item) => {
-          let multiplier = 1;
-          if (item.variantName?.includes('Combo 2')) multiplier = 2;
-          else if (item.variantName?.includes('Combo 3')) multiplier = 3;
-          return sum + (item.quantity * multiplier);
-      }, 0);
-  };
-
-  // =================================================================
-  // LOGIC TÍNH GIÁ QUAN TRỌNG (ĐÃ FIX)
-  // =================================================================
+  // --- 2. LOGIC TÍNH GIÁ CHUẨN XÁC (DỰA VÀO BẢNG GIÁ) ---
   const calculateItemTotal = (item: CartItem) => {
-    // 1. Tìm giá chuẩn trong Sheet (dựa vào ID sản phẩm)
+    // Nếu đang load dữ liệu hoặc không tìm thấy giá, trả về giá tạm
+    // (Nhưng UI sẽ hiển thị loading nên user không thấy giá sai này)
     const priceInfo = productPrices[item.id];
+    if (!priceInfo) return { total: item.price * item.quantity, discount: 0 };
+
     const qty = item.quantity;
-
-    // --- CASE A: Không tìm thấy giá trong Sheet (hoặc chưa load xong) ---
-    // -> Dùng tạm giá lúc thêm vào giỏ (item.price)
-    if (!priceInfo) {
-        return { total: Math.round(item.price * qty), discount: 0 };
-    }
-
-    // --- CASE B: Phân loại Combo 2 (Đã chọn mua theo Set) ---
-    if (item.variantName?.includes('Combo 2')) {
-        // Lấy giá Combo 2 trong Sheet. Nếu không có thì fallback: Giá lẻ * 2 * 0.95
-        const c2Price = (priceInfo.combo2Price > 0) 
-            ? priceInfo.combo2Price 
-            : (priceInfo.salePrice * 2 * 0.95);
-        
-        // qty lúc này là số lượng set (ví dụ mua 2 set combo 2)
-        return { total: Math.round(c2Price * qty), discount: 0 };
-    }
-
-    // --- CASE C: Phân loại Combo 3 (Đã chọn mua theo Set) ---
-    if (item.variantName?.includes('Combo 3')) {
-        // Lấy giá Combo 3 trong Sheet. Nếu không có thì fallback: Giá lẻ * 3 * 0.90
-        const c3Price = (priceInfo.combo3Price > 0) 
-            ? priceInfo.combo3Price 
-            : (priceInfo.salePrice * 3 * 0.90);
-            
-        return { total: Math.round(c3Price * qty), discount: 0 };
-    }
-
-    // --- CASE D: Phân loại "1 Hộp" (Single) - TÍNH BẬC THANG ---
-    // (Bất kỳ loại nào không phải Combo 2/3 đều rơi vào đây)
-    
     let total = 0;
-    const salePrice = priceInfo.salePrice; // Giá 1 hộp
-    // Giá Combo 2 & 3 lấy từ sheet
-    const c2Price = (priceInfo.combo2Price > 0) ? priceInfo.combo2Price : (salePrice * 2 * 0.95);
-    const c3Price = (priceInfo.combo3Price > 0) ? priceInfo.combo3Price : (salePrice * 3 * 0.90);
 
-    if (qty === 1) {
-        // Mua 1: Giá lẻ
-        total = salePrice;
+    // A. Nếu là phân loại "1 Hộp" (Single) - Tính bậc thang
+    if (!item.variantName?.includes('Combo')) {
+        if (qty === 1) {
+            total = priceInfo.salePrice;
+        } else if (qty === 2) {
+            // Ưu tiên giá trong sheet, nếu không có mới tự tính
+            total = priceInfo.combo2Price > 0 ? priceInfo.combo2Price : (priceInfo.salePrice * 2 * 0.95);
+        } else if (qty === 3) {
+            total = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (priceInfo.salePrice * 3 * 0.90);
+        } else {
+            // Mua > 3: Giá Combo 3 + (Số lẻ * Giá 1 hộp)
+            const combo3 = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (priceInfo.salePrice * 3 * 0.90);
+            const extraQty = qty - 3;
+            total = combo3 + (extraQty * priceInfo.salePrice);
+        }
     } 
-    else if (qty === 2) {
-        // Mua 2: Giá bằng Combo 2
-        total = c2Price;
-    } 
-    else if (qty === 3) {
-        // Mua 3: Giá bằng Combo 3
-        total = c3Price;
-    } 
-    else {
-        // Mua > 3 (Ví dụ 4, 5, 6...)
-        // Công thức: Giá Combo 3 + (Số lượng thừa * Giá lẻ 1 hộp)
-        const extraQty = qty - 3;
-        total = c3Price + (extraQty * salePrice);
+    // B. Nếu là Combo 2 (Đơn vị tính là Set)
+    else if (item.variantName?.includes('Combo 2')) {
+        const c2Price = priceInfo.combo2Price > 0 ? priceInfo.combo2Price : (priceInfo.salePrice * 2 * 0.95);
+        total = c2Price * qty;
+    }
+    // C. Nếu là Combo 3 (Đơn vị tính là Set)
+    else if (item.variantName?.includes('Combo 3')) {
+        const c3Price = priceInfo.combo3Price > 0 ? priceInfo.combo3Price : (priceInfo.salePrice * 3 * 0.90);
+        total = c3Price * qty;
     }
 
     return { total: Math.round(total), discount: 0 };
   };
 
   const subtotal = Math.round(cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0));
-  const totalBoxes = calculateTotalBoxes(cart);
+  const totalBoxes = (cartItems: CartItem[]) => {
+      return cartItems.reduce((sum, item) => {
+          let multiplier = 1;
+          if (item.variantName?.includes('Combo 2')) multiplier = 2;
+          else if (item.variantName?.includes('Combo 3')) multiplier = 3;
+          return sum + (item.quantity * multiplier);
+      }, 0);
+  }(cart);
+  
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- LOGIC VOUCHER (Giữ nguyên) ---
+  // --- 3. LOGIC VOUCHER (Giữ nguyên) ---
   useEffect(() => {
     if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
         setAppliedShippingVoucher(null);
         return;
     }
-
     const shippingCandidates = vouchers.filter(v => {
         if (v.type !== 'shipping') return false;
         if (v.minCondition > 1000) return subtotal >= v.minCondition;
         return totalBoxes >= v.minCondition;
     }).sort((a, b) => b.value - a.value);
-
     setAppliedShippingVoucher(shippingCandidates.length > 0 ? shippingCandidates[0] : null);
 
     const discountCandidates = vouchers.filter(v => 
         v.type === 'discount' && subtotal >= v.minCondition
     ).sort((a, b) => b.value - a.value);
-
     setAppliedDiscountVoucher(discountCandidates.length > 0 ? discountCandidates[0] : null);
-
-  }, [cart, subtotal, totalBoxes, formData.address, vouchers]);
+  }, [cart, subtotal, totalBoxes, formData.address, vouchers, isLoadingData]); // Thêm dependency isLoadingData
 
   
   let shippingDiscountAmount = 0;
-  if (appliedShippingVoucher) {
-      shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
-  }
-
+  if (appliedShippingVoucher) shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
   let productDiscountAmount = 0;
-  if (appliedDiscountVoucher) {
-      productDiscountAmount = appliedDiscountVoucher.value;
-  }
+  if (appliedDiscountVoucher) productDiscountAmount = appliedDiscountVoucher.value;
 
   const finalShippingFee = Math.max(0, baseShippingFee - shippingDiscountAmount);
   const finalTotal = Math.max(0, subtotal + finalShippingFee - productDiscountAmount);
 
-  // --- UI Helper ---
+  // --- UI Helper Functions ---
   const getVoucherStatus = (voucher: Voucher) => {
+      // (Giữ nguyên logic cũ)
       if (voucher.type === 'shipping') {
           const isMonetary = voucher.minCondition > 1000;
           if (isMonetary) {
@@ -239,6 +206,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   };
 
   const handleManualApply = () => {
+    // (Giữ nguyên logic cũ)
     const code = voucherCodeInput.trim().toUpperCase();
     if(!code) return;
     const found = vouchers.find(v => v.code === code);
@@ -252,6 +220,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // (Giữ nguyên logic cũ)
     const { name, value } = e.target;
     if (name === 'fullName') setFormData(prev => ({ ...prev, [name]: value.replace(/[0-9!@#$%^&*()_+={}\[\]|\\:;"'<>,.?/]/g, '') }));
     else if (name === 'phone') setFormData(prev => ({ ...prev, [name]: value.replace(/\D/g, '').slice(0, 12) }));
@@ -260,6 +229,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // (Giữ nguyên logic cũ)
     e.preventDefault();
     if (cart.length === 0) return;
     const rawPhone = formData.phone.replace(/\s/g, '');
@@ -271,9 +241,9 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         id: item.id,
         name: item.name,
         variant: item.variantName || '1 Hộp',
-        price: item.price,
+        price: item.price, // Giá hiển thị
         quantity: item.quantity,
-        subtotal: calculateItemTotal(item).total
+        subtotal: calculateItemTotal(item).total // Giá thực tính
     }));
 
     const voucherCodes = [];
@@ -321,6 +291,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const closeCart = () => { setOrderSuccess(false); setSuccessOrderId(''); setError(null); onClose(); };
   
   const handleAutoSaveAndClose = async () => {
+      // (Giữ nguyên logic cũ)
       if (receiptRef.current) {
           setIsCapturing(true);
           try {
@@ -345,6 +316,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar overscroll-contain">
           {orderSuccess ? (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in">
+               {/* --- SUCCESS VIEW --- */}
                <div ref={receiptRef} className="w-full flex flex-col items-center p-6 bg-white rounded-xl">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2 shadow-sm"><Truck size={40} /></div>
                   <h3 className="text-2xl font-serif font-bold text-gray-800">Đặt hàng thành công!</h3>
@@ -370,7 +342,9 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
             <div className="space-y-6">
               <div className="space-y-4">
                 {cart.map((item) => {
+                  // Gọi hàm tính toán
                   const { total: itemTotal } = calculateItemTotal(item);
+                  
                   return (
                     <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="w-20 h-20 bg-white rounded-lg overflow-hidden shrink-0 border border-gray-100">
@@ -395,7 +369,12 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-brand">+</button>
                           </div>
                           <div className="text-right">
-                              <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>
+                              {/* HIỂN THỊ TRẠNG THÁI LOADING NẾU CHƯA CÓ GIÁ */}
+                              {isLoadingData ? (
+                                  <span className="text-xs text-gray-400 flex items-center gap-1 justify-end"><Loader2 size={12} className="animate-spin"/> Tính giá...</span>
+                              ) : (
+                                  <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -404,12 +383,14 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                 })}
               </div>
 
+               {/* --- VOUCHER --- */}
                <div className="border-t border-gray-100 pt-6">
                     <h3 className="font-serif font-bold text-sm mb-3 flex items-center gap-2 text-gray-700"><Ticket size={18} className="text-brand" /> Ưu đãi cho bạn</h3>
                     {isLoadingData ? (
                         <div className="text-center py-4 text-gray-400 text-xs flex justify-center items-center gap-2"><Loader2 size={16} className="animate-spin" /> Đang cập nhật giá mới nhất...</div>
                     ) : (
                         <>
+                            {/* ... Phần hiển thị Voucher list giữ nguyên ... */}
                             <div className="mb-4">
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã vận chuyển</p>
                                 <div className="space-y-2">
@@ -436,31 +417,28 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                                     {vouchers.filter(v => v.type === 'shipping').length === 0 && <p className="text-xs text-gray-400 italic">Không có mã vận chuyển.</p>}
                                 </div>
                             </div>
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mã giảm giá</p>
-                                <div className="space-y-2">
-                                    {vouchers.filter(v => v.type === 'discount').map(voucher => {
-                                        const status = getVoucherStatus(voucher);
-                                        const isApplied = appliedDiscountVoucher?.code === voucher.code;
-                                        return (
-                                            <div key={voucher.code} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
-                                                <div className="flex items-start gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-green-200 text-green-700' : status.eligible ? 'bg-orange-50 text-orange-400' : 'bg-gray-100 text-gray-400'}`}><Zap size={20} /></div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-2"><h4 className={`font-bold text-sm ${isApplied ? 'text-green-800' : 'text-gray-700'}`}>{voucher.code}</h4>{isApplied && <span className="text-[10px] bg-green-600 text-white px-1.5 rounded font-bold">Tốt nhất</span>}</div>
-                                                            {isApplied && <Check size={18} className="text-green-600" />}
-                                                            {!status.eligible && <Lock size={16} className="text-gray-300" />}
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
-                                                        {!status.eligible && <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1"><Info size={10} /> {status.missingText}</p>}
+                            {/* ... Discount list ... */}
+                            <div className="space-y-2">
+                                {vouchers.filter(v => v.type === 'discount').map(voucher => {
+                                    const status = getVoucherStatus(voucher);
+                                    const isApplied = appliedDiscountVoucher?.code === voucher.code;
+                                    return (
+                                        <div key={voucher.code} className={`relative border rounded-lg p-3 transition-all ${isApplied ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                            <div className="flex items-start gap-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isApplied ? 'bg-green-200 text-green-700' : status.eligible ? 'bg-orange-50 text-orange-400' : 'bg-gray-100 text-gray-400'}`}><Zap size={20} /></div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2"><h4 className={`font-bold text-sm ${isApplied ? 'text-green-800' : 'text-gray-700'}`}>{voucher.code}</h4>{isApplied && <span className="text-[10px] bg-green-600 text-white px-1.5 rounded font-bold">Tốt nhất</span>}</div>
+                                                        {isApplied && <Check size={18} className="text-green-600" />}
+                                                        {!status.eligible && <Lock size={16} className="text-gray-300" />}
                                                     </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{voucher.description}</p>
+                                                    {!status.eligible && <p className="text-[10px] text-orange-600 font-medium mt-1 flex items-center gap-1"><Info size={10} /> {status.missingText}</p>}
                                                 </div>
                                             </div>
-                                        )
-                                    })}
-                                    {vouchers.filter(v => v.type === 'discount').length === 0 && <p className="text-xs text-gray-400 italic">Không có mã giảm giá.</p>}
-                                </div>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </>
                     )}
@@ -482,15 +460,23 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
           )}
         </div>
 
+        {/* FOOTER */}
         {!orderSuccess && cart.length > 0 && (
           <div className="p-5 border-t border-gray-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0">
             <div className="space-y-2 mb-4 text-sm">
-                <div className="flex justify-between items-center text-gray-500"><span>Tạm tính:</span><span>{subtotal.toLocaleString('vi-VN')}đ</span></div>
+                <div className="flex justify-between items-center text-gray-500">
+                    <span>Tạm tính:</span>
+                    {/* Hiển thị Loading nếu đang load giá */}
+                    {isLoadingData ? <span className="text-xs text-gray-400"><Loader2 size={12} className="animate-spin inline"/> Đang tính...</span> : <span>{subtotal.toLocaleString('vi-VN')}đ</span>}
+                </div>
                 <div className="flex justify-between items-center text-gray-500"><span>Phí vận chuyển:</span><div className="text-right">{finalShippingFee === 0 && baseShippingFee > 0 ? <><span className="text-xs text-gray-400 line-through mr-1">{baseShippingFee.toLocaleString('vi-VN')}đ</span><span className="text-green-600 font-medium">Miễn phí</span></> : <span>{baseShippingFee.toLocaleString('vi-VN')}đ</span>}</div></div>
                 {productDiscountAmount > 0 && (<div className="flex justify-between items-center text-green-600"><span className="flex items-center gap-1"><Ticket size={14}/> Voucher giảm giá:</span><span>-{productDiscountAmount.toLocaleString('vi-VN')}đ</span></div>)}
-                <div className="flex justify-between items-center text-base pt-2 border-t border-dashed border-gray-200"><span className="font-bold text-gray-800">Tổng thanh toán:</span><span className="text-2xl font-bold text-brand">{finalTotal.toLocaleString('vi-VN')}đ</span></div>
+                <div className="flex justify-between items-center text-base pt-2 border-t border-dashed border-gray-200">
+                    <span className="font-bold text-gray-800">Tổng thanh toán:</span>
+                    {isLoadingData ? <span className="text-sm text-gray-400">Đang cập nhật...</span> : <span className="text-2xl font-bold text-brand">{finalTotal.toLocaleString('vi-VN')}đ</span>}
+                </div>
             </div>
-            <button type="submit" form="order-form" disabled={isSubmitting} className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand hover:bg-brand-accent active:scale-95'}`}>{isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Đang xử lý...</> : 'Đặt Hàng Ngay'}</button>
+            <button type="submit" form="order-form" disabled={isSubmitting || isLoadingData} className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${isSubmitting || isLoadingData ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand hover:bg-brand-accent active:scale-95'}`}>{isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Đang xử lý...</> : 'Đặt Hàng Ngay'}</button>
             <p className="text-center text-xs text-gray-400 mt-3">Thanh toán khi nhận hàng (COD)</p>
           </div>
         )}
