@@ -6,7 +6,6 @@ import { CartItem, OrderForm } from '../types';
 // --- CẤU HÌNH API MỚI ---
 const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbzCzJ2SQ3iPmiJZNKg5k6Ti_9Y6EI79bLmVyhhQmBkPbSfFVga2f4hva_3-_2H-7h3k/exec";
 
-// Định nghĩa kiểu dữ liệu Voucher động từ API
 interface Voucher {
   code: string;
   type: 'shipping' | 'discount';
@@ -46,11 +45,9 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const [successOrderId, setSuccessOrderId] = useState('');
   const [error, setError] = useState<string | null>(null);
   
-  // --- STATE DỮ LIỆU VOUCHER ĐỘNG TỪ SHEET ---
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
 
-  // Voucher Logic States
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [appliedDiscountVoucher, setAppliedDiscountVoucher] = useState<Voucher | null>(null);
   const [appliedShippingVoucher, setAppliedShippingVoucher] = useState<Voucher | null>(null);
@@ -59,7 +56,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const [isCapturing, setIsCapturing] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch Voucher từ Google Sheet khi mở giỏ hàng
   useEffect(() => {
       const fetchVouchers = async () => {
           setIsLoadingVouchers(true);
@@ -75,7 +71,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
               setIsLoadingVouchers(false);
           }
       };
-      
       if (isOpen && vouchers.length === 0) fetchVouchers();
   }, [isOpen]);
 
@@ -93,25 +88,48 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
       }, 0);
   };
 
-  // --- LOGIC TÍNH GIÁ MỚI: Chỉ nhân số lượng và làm tròn ---
+  // --- LOGIC TÍNH GIÁ CHUẨN XÁC TỪNG ĐỒNG ---
   const calculateItemTotal = (item: CartItem) => {
-    // item.price lúc này là "đơn giá ảo" (có thể bị lẻ thập phân)
-    // Nhân với số lượng sẽ ra tổng tiền chẵn
-    const rawTotal = item.price * item.quantity;
+    // Nếu có pricingRules (tức là phân loại "1 Hộp" có tính giá bậc thang)
+    // @ts-ignore: Bỏ qua lỗi type check cho pricingRules
+    if (item.pricingRules) {
+        // @ts-ignore
+        const rules = item.pricingRules;
+        const q = item.quantity;
+        let total = 0;
+        let original = 0;
+
+        if (q === 1) {
+            total = rules.base;
+            original = rules.originalBase;
+        } else if (q === 2) {
+            total = rules.c2;
+            original = rules.originalBase * 2;
+        } else if (q === 3) {
+            total = rules.c3;
+            original = rules.originalBase * 3;
+        } else {
+            // > 3: Giá Combo 3 + (Số lượng thừa * Giá lẻ)
+            const extra = q - 3;
+            total = rules.c3 + (extra * rules.base);
+            original = rules.originalBase * q;
+        }
+        return { total, discount: 0, originalTotal: original };
+    } 
     
-    // Làm tròn để loại bỏ số lẻ (VD: 626666.666 -> 626667)
-    const total = Math.round(rawTotal);
-    
-    return { total: total, discount: 0, originalTotal: total };
+    // Nếu là Combo 2 hoặc Combo 3 (giá fix theo set)
+    // item.price lúc này là giá trọn gói 1 set -> nhân số lượng set
+    const total = item.price * item.quantity;
+    return { total: Math.round(total), discount: 0, originalTotal: total }; 
   };
 
-  // Tính tổng giỏ hàng (Cũng làm tròn cho chắc chắn)
+  // Tính tổng (Dùng Math.round để chắc chắn không lẻ)
   const subtotal = Math.round(cart.reduce((sum, item) => sum + calculateItemTotal(item).total, 0));
   
   const totalBoxes = calculateTotalBoxes(cart);
   const baseShippingFee = isNorthernLocation(formData.address) ? 15000 : 20000;
 
-  // --- LOGIC TỰ ĐỘNG ÁP DỤNG VOUCHER (THÔNG MINH) ---
+  // --- LOGIC VOUCHER ---
   useEffect(() => {
     if (cart.length === 0 || vouchers.length === 0) {
         setAppliedDiscountVoucher(null);
@@ -136,7 +154,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   }, [cart, subtotal, totalBoxes, formData.address, vouchers]);
 
   
-  // Tính toán tiền cuối cùng
   let shippingDiscountAmount = 0;
   if (appliedShippingVoucher) {
       shippingDiscountAmount = Math.min(baseShippingFee, appliedShippingVoucher.value); 
@@ -150,7 +167,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
   const finalShippingFee = Math.max(0, baseShippingFee - shippingDiscountAmount);
   const finalTotal = Math.max(0, subtotal + finalShippingFee - productDiscountAmount);
 
-  // --- Helper UI Voucher ---
+  // --- Helper UI ---
   const getVoucherStatus = (voucher: Voucher) => {
       if (voucher.type === 'shipping') {
           const isMonetaryCondition = voucher.minCondition > 1000;
@@ -328,6 +345,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar overscroll-contain">
           {orderSuccess ? (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in">
+               {/* Phần Order Success giữ nguyên */}
                <div ref={receiptRef} className="w-full flex flex-col items-center p-6 bg-white rounded-xl">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2 shadow-sm"><Truck size={40} /></div>
                   <h3 className="text-2xl font-serif font-bold text-gray-800">Đặt hàng thành công!</h3>
@@ -357,7 +375,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
               {/* Product Items */}
               <div className="space-y-4">
                 {cart.map((item) => {
-                  const { total: itemTotal, discount, originalTotal } = calculateItemTotal(item);
+                  const { total: itemTotal } = calculateItemTotal(item);
                   return (
                     <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="w-20 h-20 bg-white rounded-lg overflow-hidden shrink-0 border border-gray-100">
@@ -369,7 +387,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {item.variantName ? <span className="text-xs font-semibold text-brand-accent bg-green-50 px-1.5 py-0.5 rounded">{item.variantName}</span> : <span className="text-xs font-medium text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded">1 Hộp</span>}
-                                {/* {discount > 0 && <span className="text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded flex items-center gap-0.5"><Tag size={10} /> -{discount}%</span>} */}
                               </div>
                           </div>
                           <button onClick={() => onRemove(item.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
@@ -381,7 +398,6 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                               <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-brand">+</button>
                           </div>
                           <div className="text-right">
-                              {/* {discount > 0 && <span className="block text-xs text-gray-400 line-through">{originalTotal.toLocaleString('vi-VN')}đ</span>} */}
                               <span className="font-bold text-brand text-sm">{itemTotal.toLocaleString('vi-VN')}đ</span>
                           </div>
                         </div>
@@ -516,7 +532,7 @@ export const CartSidebar: React.FC<CartProps> = ({ isOpen, onClose, cart, onRemo
                     <input type="tel" name="phone" required inputMode="numeric" maxLength={12} placeholder="Số điện thoại" value={formData.phone} onFocus={() => { if (!formData.phone) setFormData(prev => ({ ...prev, phone: '0' })); }} onChange={handleInputChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all text-sm" />
                   </div>
                   
-                  {/* Ô nhập địa chỉ - Input thường */}
+                  {/* Ô nhập địa chỉ */}
                   <div>
                     <input 
                         type="text" 
