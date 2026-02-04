@@ -16,7 +16,7 @@ interface ProductPrice {
     salePrice: number;
     combo2Price?: number;
     combo3Price?: number;
-    combo3Label?: string; // Label quà tặng từ Sheet (VD: Tặng thêm 1 hộp)
+    combo3Label?: string;
 }
 
 type ComboOption = 'single' | 'combo2' | 'combo3';
@@ -61,7 +61,6 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [pricingMap, setPricingMap] = useState<Record<string, ProductPrice>>({});
 
-  // Fetch Giá từ Google Sheet
   useEffect(() => {
       const fetchPrices = async () => {
           try {
@@ -102,79 +101,83 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
   const nextMedia = () => setMediaIndex((prev) => (prev + 1) % mediaList.length);
   const prevMedia = () => setMediaIndex((prev) => (prev - 1 + mediaList.length) % mediaList.length);
 
-  // --- LOGIC THÔNG MINH: Thay đổi số lượng -> Tự động nhảy Combo ---
   const updateQuantity = (newQty: number) => {
       setQuantity(newQty);
-      if (newQty >= 3) setSelectedCombo('combo3');
-      else if (newQty === 2) setSelectedCombo('combo2');
-      else setSelectedCombo('single');
+      // Logic cũ: Tự nhảy combo -> Đã bỏ để user tự chọn theo ý muốn
+      // Nhưng nếu user đang ở 'single' mà tăng số lượng, giá sẽ tự nhảy theo rule "cộng dồn"
   };
 
-  // --- LOGIC NGƯỢC LẠI: Chọn Combo -> Tự động set số lượng tối thiểu ---
   const handleComboSelect = (option: ComboOption) => {
       setSelectedCombo(option);
-      if (option === 'combo3' && quantity < 3) setQuantity(3);
-      else if (option === 'combo2' && quantity !== 2) setQuantity(2);
-      else if (option === 'single' && quantity !== 1) setQuantity(1);
+      // Reset số lượng về 1 khi chuyển loại để tránh nhầm lẫn
+      if (option === 'combo3' && quantity < 1) setQuantity(1);
+      else if (option === 'combo2' && quantity < 1) setQuantity(1);
+      else if (option === 'single' && quantity < 1) setQuantity(1);
   };
 
-  // --- LOGIC TÍNH TOÁN GIÁ & QUÀ TẶNG ---
-  const getPriceDetails = (product: Product, option: ComboOption) => {
+  // --- LOGIC TÍNH GIÁ MỚI (QUAN TRỌNG) ---
+  const getPriceDetails = (product: Product, option: ComboOption, qty: number = 1) => {
     const sheetData = pricingMap[product.id];
     
     const basePrice = sheetData ? sheetData.salePrice : product.price;
     const originalBase = sheetData ? sheetData.originalPrice : product.price * 1.4;
+    
+    // Lấy giá Combo từ sheet (hoặc tự tính nếu sheet chưa có)
+    const combo2Price = (sheetData && sheetData.combo2Price) ? sheetData.combo2Price : (basePrice * 2 * 0.95);
+    const combo3Price = (sheetData && sheetData.combo3Price) ? sheetData.combo3Price : (basePrice * 3 * 0.90);
+    const combo3Label = (sheetData && sheetData.combo3Label) ? sheetData.combo3Label : "";
 
-    // 1. Tính Đơn giá thực tế cho từng mốc (Unit Price)
-    let effectiveUnitPrice = basePrice;
-    let label = '1 Hộp';
-    let discountTag = '';
-    let specialLabel = ''; // Label quà tặng (VD: Tặng 1 hộp)
+    let totalPrice = 0;
+    let label = "";
+    let discountTag = "";
+    let specialLabel = "";
+    let originalTotal = 0;
 
-    if (option === 'combo2') {
-        let packagePrice;
-        if (sheetData && sheetData.combo2Price && sheetData.combo2Price > 0) {
-            packagePrice = sheetData.combo2Price;
+    // 1. Logic cho "1 Hộp (Single)" - Có quy tắc cộng dồn đặc biệt
+    if (option === 'single') {
+        label = "1 Hộp";
+        if (qty === 1) {
+            totalPrice = basePrice;
+            originalTotal = originalBase;
+        } else if (qty === 2) {
+            totalPrice = combo2Price;
+            originalTotal = originalBase * 2;
+        } else if (qty === 3) {
+            totalPrice = combo3Price;
+            originalTotal = originalBase * 3;
+            if (combo3Label) specialLabel = combo3Label;
         } else {
-            packagePrice = basePrice * 2 * 0.95; // Mặc định giảm 5%
+            // Qty > 3: Giá = Combo 3 + (Qty - 3) * Giá lẻ
+            totalPrice = combo3Price + ((qty - 3) * basePrice);
+            originalTotal = originalBase * qty;
+            if (combo3Label) specialLabel = combo3Label;
         }
-        effectiveUnitPrice = packagePrice / 2; // Chia ngược lại để ra đơn giá khi mua combo
-        label = 'Combo 2 Hộp';
-        
-        // Tính % giảm
-        const savedPercent = Math.round(((originalBase * 2 - packagePrice) / (originalBase * 2)) * 100);
-        discountTag = `-${savedPercent}%`;
     } 
+    // 2. Logic cho Combo 2 (Đơn vị tính là Set)
+    // Nếu chọn Combo 2, số lượng là 1 -> Giá Combo 2. Số lượng 2 -> 2 * Giá Combo 2
+    else if (option === 'combo2') {
+        label = "Combo 2 Hộp";
+        totalPrice = combo2Price * qty;
+        originalTotal = (originalBase * 2) * qty;
+    }
+    // 3. Logic cho Combo 3 (Đơn vị tính là Set)
     else if (option === 'combo3') {
-        let packagePrice;
-        if (sheetData && sheetData.combo3Price && sheetData.combo3Price > 0) {
-            packagePrice = sheetData.combo3Price;
-        } else {
-            packagePrice = basePrice * 3 * 0.90; // Mặc định giảm 10%
-        }
-        effectiveUnitPrice = packagePrice / 3; // Đơn giá siêu rẻ khi mua số lượng lớn
-        label = 'Combo 3 Hộp';
-
-        // Xử lý Label Quà tặng từ Sheet
-        if (sheetData && sheetData.combo3Label) {
-            specialLabel = sheetData.combo3Label; // VD: "Tặng thêm 1 hộp"
-        }
-
-        // Nếu có quà tặng thì hiện tag HOT, không thì hiện % giảm
-        const savedPercent = Math.round(((originalBase * 3 - packagePrice) / (originalBase * 3)) * 100);
-        discountTag = specialLabel ? 'HOT' : `-${savedPercent}%`;
+        label = "Combo 3 Hộp";
+        totalPrice = combo3Price * qty;
+        originalTotal = (originalBase * 3) * qty;
+        if (combo3Label) specialLabel = combo3Label;
     }
-    else {
-        // Single
-        const savedPercent = Math.round(((originalBase - basePrice) / originalBase) * 100);
-        discountTag = savedPercent > 0 ? `-${savedPercent}%` : '';
-    }
+
+    // Tính % giảm giá hiển thị
+    const savedPercent = Math.round(((originalTotal - totalPrice) / originalTotal) * 100);
+    discountTag = specialLabel ? 'HOT' : (savedPercent > 0 ? `-${savedPercent}%` : '');
 
     return { 
-        unitPrice: effectiveUnitPrice, // Giá của 1 hộp tại mốc này
+        totalPrice, // Tổng tiền cuối cùng (Số chẵn)
+        unitPriceForCart: totalPrice / qty, // Giá để truyền vào giỏ (có thể lẻ, nhưng giỏ sẽ nhân lại qty)
         label, 
         discount: discountTag, 
-        originalBase,
+        originalTotal,
         specialLabel 
     };
   };
@@ -182,20 +185,12 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
   const handleAddToCart = () => {
     if (!selectedProduct) return;
     
-    // Tính toán lại dựa trên số lượng thực tế khách đang chọn
-    // Nếu khách đang chọn quantity = 4 và đang ở mốc combo3
-    // Giá sẽ là: (Giá combo 3 / 3) * 4
-    const details = getPriceDetails(selectedProduct, selectedCombo);
-    const finalPricePerItem = details.unitPrice;
+    const details = getPriceDetails(selectedProduct, selectedCombo, quantity);
     
-    // Tên variant hiển thị trong giỏ hàng
-    // Nếu có quà tặng, ghép vào tên variant luôn: "Combo 3 Hộp (Tặng thêm 1 hộp)"
+    // Tên hiển thị trong giỏ
     let variantName = details.label;
-    if (details.specialLabel) {
-        variantName += ` (${details.specialLabel})`;
-    } else if (quantity > 3) {
-        variantName = `Mua nhiều (${quantity} hộp)`;
-    }
+    if (details.specialLabel) variantName += ` (${details.specialLabel})`;
+    else if (selectedCombo === 'single' && quantity > 3) variantName = `Mua nhiều (${quantity} hộp)`;
 
     let cartImage = selectedProduct.image;
     if (selectedCombo === 'combo2' && selectedProduct.skuImages?.combo2) cartImage = selectedProduct.skuImages.combo2;
@@ -205,7 +200,7 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
         { ...selectedProduct, image: cartImage }, 
         quantity, 
         variantName, 
-        finalPricePerItem // Truyền đơn giá đã chiết khấu
+        details.unitPriceForCart // Truyền giá (có thể lẻ)
     );
     closeModal();
   };
@@ -224,7 +219,8 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {PRODUCTS.map((product) => {
-            const prices = getPriceDetails(product, 'single');
+            // Ở danh sách ngoài, luôn hiển thị giá 1 hộp
+            const prices = getPriceDetails(product, 'single', 1);
             return (
                 <div 
                 key={product.id} 
@@ -250,8 +246,8 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
 
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
                     <div className="flex flex-col">
-                        {prices.originalBase > prices.unitPrice && (<span className="text-[10px] text-gray-400 line-through">{prices.originalBase.toLocaleString('vi-VN')}đ</span>)}
-                        <span className="text-lg font-bold text-brand">{prices.unitPrice.toLocaleString('vi-VN')}đ</span>
+                        {prices.originalTotal > prices.totalPrice && (<span className="text-[10px] text-gray-400 line-through">{prices.originalTotal.toLocaleString('vi-VN')}đ</span>)}
+                        <span className="text-lg font-bold text-brand">{prices.totalPrice.toLocaleString('vi-VN')}đ</span>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); openModal(product); }} className="bg-brand text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-brand-light transition-colors shadow-sm">
                         <Plus size={16} />
@@ -301,9 +297,9 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
                             <h3 className="font-bold text-brand mb-3 flex items-center gap-2 text-sm uppercase tracking-wide"><Package size={18} /> Chọn gói ưu đãi</h3>
                             <div className="space-y-3">
                                 {(['single', 'combo2', 'combo3'] as const).map(sku => {
-                                    const details = getPriceDetails(selectedProduct, sku);
+                                    // Hiển thị giá của 1 set combo (qty=1) để khách biết giá gốc
+                                    const details = getPriceDetails(selectedProduct, sku, 1);
                                     
-                                    // Kiểm tra xem đây có phải là option đang active không
                                     const isSelected = selectedCombo === sku;
                                     
                                     return (
@@ -336,23 +332,18 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {/* Hiển thị label quà tặng rõ ràng bên dưới */}
                                                     {details.specialLabel && (
-                                                        <span className="text-[10px] text-purple-600 font-medium italic mt-0.5 flex items-center gap-1">
-                                                            <Gift size={10} /> {details.specialLabel}
-                                                        </span>
+                                                        <span className="text-[10px] text-purple-600 font-medium italic mt-0.5 flex items-center gap-1"><Gift size={10} /> {details.specialLabel}</span>
                                                     )}
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                {/* Hiển thị tổng giá theo mốc (VD: Mua 3 thì hiện tổng tiền 3 hộp) */}
                                                 <span className="block font-bold text-gray-900">
-                                                    {(details.unitPrice * (sku === 'combo3' ? 3 : sku === 'combo2' ? 2 : 1)).toLocaleString('vi-VN')}đ
+                                                    {details.totalPrice.toLocaleString('vi-VN')}đ
                                                 </span>
-                                                {/* Giá gốc gạch ngang */}
-                                                {details.originalBase > details.unitPrice && (
+                                                {details.originalTotal > details.totalPrice && (
                                                     <span className="text-xs text-gray-400 line-through">
-                                                        {(details.originalBase * (sku === 'combo3' ? 3 : sku === 'combo2' ? 2 : 1)).toLocaleString('vi-VN')}đ
+                                                        {details.originalTotal.toLocaleString('vi-VN')}đ
                                                     </span>
                                                 )}
                                             </div>
@@ -373,7 +364,6 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
                         </div>
                     </div>
 
-                    {/* STICKY FOOTER TÍNH TOÁN */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white border-t border-gray-100 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-20 flex flex-col md:flex-row items-center gap-3">
                           <div className="w-full md:w-auto flex items-center justify-between md:justify-start gap-4 md:mr-auto bg-gray-50 rounded-full px-4 py-2">
                              <div className="flex items-center gap-3">
@@ -383,10 +373,11 @@ export const ProductList: React.FC<ProductsProps> = ({ onAddToCart }) => {
                              </div>
                              <div className="flex flex-col items-end md:items-start">
                                  <span className="text-xs text-gray-400">Tạm tính:</span>
-                                 <span className="text-xl font-bold text-brand">{(getPriceDetails(selectedProduct, selectedCombo).unitPrice * quantity).toLocaleString('vi-VN')}đ</span>
+                                 <span className="text-xl font-bold text-brand">
+                                    {getPriceDetails(selectedProduct, selectedCombo, quantity).totalPrice.toLocaleString('vi-VN')}đ
+                                 </span>
                              </div>
                           </div>
-                          
                           <button onClick={handleAddToCart} className="w-full md:w-auto md:min-w-[200px] bg-brand hover:bg-brand-accent text-white py-3.5 rounded-full font-bold text-lg transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2">
                              <ShoppingBag size={20} /> Thêm Vào Giỏ
                           </button>
